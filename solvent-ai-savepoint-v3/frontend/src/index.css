@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-jb-dark text-jb-text font-sans antialiased overflow-hidden selection:bg-jb-accent/30 tracking-tight;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-thin::-webkit-scrollbar { width: 3px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors; }
+
+  .text-vibrant {
+    @apply bg-gradient-to-r from-jb-accent via-jb-purple to-jb-orange bg-clip-text text-transparent;
+    filter: drop-shadow(0 0 15px rgba(157, 91, 210, 0.3));
+  }
+
+  .glass-panel {
+    @apply bg-black/25 backdrop-blur-3xl border border-white/5 shadow-2xl relative overflow-hidden;
+  }
+
+  /* Add a rim-light effect to glass panels */
+  .glass-panel::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none border border-white/5 rounded-[inherit];
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.02) 100%);
+  }
+
+  @keyframes border-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .vibrant-border::after {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    z-index: -1;
+    background: linear-gradient(90deg, #3C71F7, #9D5BD2, #FB923C, #F43F5E, #3C71F7);
+    background-size: 300% 100%;
+    @apply rounded-[inherit] opacity-40;
+    animation: border-flow 8s linear infinite;
+    filter: blur(1px);
+  }
+
+  /* Chat bubble refinements - more translucent and glass-like */
+  .chat-bubble-user {
+    @apply bg-gradient-to-br from-jb-accent/90 via-jb-purple/90 to-jb-pink/90 backdrop-blur-xl text-white shadow-2xl shadow-jb-accent/20 border border-white/20;
+  }
+
+  .chat-bubble-ai {
+    @apply bg-black/40 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[40px] p-8 text-[15.5px] leading-relaxed;
+  }
+
+  .chat-bubble-ai::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none rounded-[inherit];
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+  }
+}

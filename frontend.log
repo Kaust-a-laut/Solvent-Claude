@@ -1,0 +1,26 @@
+
+> solvent-ai-v1-production@1.0.0 dev:frontend
+> cd frontend && npm run dev
+
+
+> solvent-ai-frontend@1.0.0 dev
+> vite --host
+
+
+  VITE v7.3.1  ready in 1005 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.1.179:5173/
+11:38:15 AM [vite] (client) hmr update /src/components/FloatingNotepad.tsx, /src/index.css
+11:38:26 AM [vite] (client) ✨ new dependencies optimized: react-rnd
+11:38:26 AM [vite] (client) ✨ optimized dependencies changed. reloading
+12:05:32 PM [vite] (client) hmr update /src/components/ChatArea.tsx, /src/components/ChatView.tsx, /src/components/AuraBackground.tsx, /src/components/Navigation.tsx, /src/components/FloatingNotepad.tsx, /src/components/ChatHeader.tsx, /src/components/ChatInput.tsx, /src/components/SystemStatus.tsx, /src/components/SettingsModal.tsx, /src/components/KnowledgeMap.tsx, /src/components/CodingArea.tsx, /src/components/DebateArea.tsx, /src/components/CompareArea.tsx, /src/components/CollaborateArea.tsx, /src/index.css
+12:05:40 PM [vite] (client) hmr update /src/components/FloatingNotepad.tsx, /src/index.css
+12:05:49 PM [vite] (client) hmr update /src/components/FloatingNotepad.tsx, /src/index.css
+12:09:45 PM [vite] (client) hmr update /src/components/ChatArea.tsx, /src/components/ChatView.tsx, /src/components/AuraBackground.tsx, /src/components/Navigation.tsx, /src/components/FloatingNotepad.tsx, /src/components/ChatHeader.tsx, /src/components/ChatInput.tsx, /src/components/SystemStatus.tsx, /src/components/SettingsModal.tsx, /src/components/KnowledgeMap.tsx, /src/components/CodingArea.tsx, /src/components/DebateArea.tsx, /src/components/CompareArea.tsx, /src/components/CollaborateArea.tsx, /src/index.css
+12:20:57 PM [vite] (client) hmr update /src/components/ChatArea.tsx, /src/components/ChatView.tsx, /src/components/AuraBackground.tsx, /src/components/Navigation.tsx, /src/components/FloatingNotepad.tsx, /src/components/ChatHeader.tsx, /src/components/ChatInput.tsx, /src/components/SystemStatus.tsx, /src/components/SettingsModal.tsx, /src/components/KnowledgeMap.tsx, /src/components/CodingArea.tsx, /src/components/DebateArea.tsx, /src/components/CompareArea.tsx, /src/components/CollaborateArea.tsx, /src/index.css
+12:35:52 PM [vite] (client) hmr update /src/index.css
+12:36:43 PM [vite] (client) hmr update /src/index.css, /src/components/SystemStatus.tsx
+12:36:46 PM [vite] (client) hmr update /src/components/SettingsModal.tsx, /src/index.css
+12:36:47 PM [vite] (client) hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:41:59 PM [vite] (client) hmr update /src/components/CodingArea.tsx, /src/index.css

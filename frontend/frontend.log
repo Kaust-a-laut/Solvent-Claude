@@ -1,0 +1,115 @@
+
+> solvent-ai-frontend@1.0.0 dev
+> vite --host
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+  VITE v5.4.21  ready in 1485 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.1.179:5173/
+(node:2111) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/kaust/solvent-ai/frontend/postcss.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/kaust/solvent-ai/frontend/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+1:53:07 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+1:53:07 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+1:55:58 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css, /src/components/ChatView.tsx, /src/components/SettingsModal.tsx, /src/components/KnowledgeMap.tsx, /src/components/WaterfallArea.tsx, /src/components/Navigation.tsx
+2:02:06 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:02:13 PM [vite] hmr update /src/index.css
+2:02:13 PM [vite] hmr update /src/index.css
+2:08:20 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:09:27 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:16:37 PM [vite] vite.config.ts changed, restarting server...
+2:16:37 PM [vite] vite.config.ts changed, restarting server...
+2:16:38 PM [vite] server restarted.
+2:16:48 PM [vite] hmr update /src/index.css, /src/components/ChatView.tsx, /src/components/DebateArea.tsx, /src/components/CompareArea.tsx, /src/components/CollaborateArea.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx, /src/components/SystemStatus.tsx
+2:33:23 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:34:10 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:34:10 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:34:26 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:37:15 PM [vite] http proxy error: /api/v1/health/services
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+2:41:14 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:43:30 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:44:09 PM [vite] hmr update /src/components/KnowledgeMap.tsx, /src/index.css
+2:44:09 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx
+2:47:52 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:48:11 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:48:31 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:48:32 PM [vite] page reload src/components/ChatArea.tsx
+2:50:19 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:50:20 PM [vite] page reload src/components/ChatArea.tsx
+2:52:46 PM [vite] hmr update /src/components/CollaborateArea.tsx, /src/index.css
+2:52:47 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx
+2:55:43 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:55:57 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:55:58 PM [vite] hmr update /src/index.css, /src/components/ChatArea.tsx, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx, /src/components/WaterfallArea.tsx
+2:58:02 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:58:02 PM [vite] Internal server error: /home/kaust/solvent-ai/frontend/src/components/ChatArea.tsx: Unexpected token (16:0)
+
+  14 | const CodingArea = React.lazy(() => import('./CodingArea').then(m => ({ default: m.CodingArea })));
+  15 | const KnowledgeMap = React.lazy(() => import('./KnowledgeMap').then(m => ({ default: m.KnowledgeMap })));
+> 16 | ...
+     | ^
+  17 |   const renderContent = () => {
+  18 |     switch (currentMode) {
+  19 |       case 'debate':
+  Plugin: vite:react-babel
+  File: /home/kaust/solvent-ai/frontend/src/components/ChatArea.tsx:16:0
+  14 |  const CodingArea = React.lazy(() => import('./CodingArea').then(m => ({ default: m.CodingArea })));
+  15 |  const KnowledgeMap = React.lazy(() => import('./KnowledgeMap').then(m => ({ default: m.KnowledgeMap })));
+  16 |  ...
+     |  ^
+  17 |    const renderContent = () => {
+  18 |      switch (currentMode) {
+      at constructor (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:367:19)
+      at TypeScriptParserMixin.raise (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6624:19)
+      at TypeScriptParserMixin.unexpected (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6644:16)
+      at TypeScriptParserMixin.parseExprAtom (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11508:22)
+      at TypeScriptParserMixin.parseExprAtom (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4793:20)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11145:23)
+      at TypeScriptParserMixin.parseUpdate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11130:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11110:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9890:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10963:61)
+      at TypeScriptParserMixin.parseExprOps (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10968:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10945:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10895:21)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9839:20)
+      at TypeScriptParserMixin.parseExpressionBase (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10848:23)
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:39
+      at TypeScriptParserMixin.allowInAnd (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12495:16)
+      at TypeScriptParserMixin.parseExpression (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12971:23)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9569:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12843:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12820:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13392:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13385:10)
+      at TypeScriptParserMixin.parseProgram (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12698:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12688:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14568:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10183:18)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14602:38)
+      at parser (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:261:32)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:189:28
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:113:33
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:287:14)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+2:58:04 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:58:22 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:59:19 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css

@@ -1,0 +1,270 @@
+
+> solvent-ai-frontend@1.0.0 dev
+> vite --host
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+  VITE v5.4.21  ready in 773 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.1.179:5173/
+(node:2704) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/kaust/solvent-ai/frontend/postcss.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /home/kaust/solvent-ai/frontend/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+12:21:42 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:22:16 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:23:47 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:23:47 PM [vite] Internal server error: /home/kaust/solvent-ai/frontend/src/components/AuraBackground.tsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (151:8)
+
+  149 | });
+  150 |            <div className="absolute top-[10%] right-[10%] w-[20%] h-[20%] bg-white/50 blur-[12px] rounded-full" />
+> 151 |         </motion.div>
+      |         ^
+  152 |
+  153 |         {/* Global Noise Texture for HD feel */}
+  154 |         <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+  Plugin: vite:react-babel
+  File: /home/kaust/solvent-ai/frontend/src/components/AuraBackground.tsx:151:8
+  149|  });
+  150|             <div className="absolute top-[10%] right-[10%] w-[20%] h-[20%] bg-white/50 blur-[12px] rounded-full" />
+  151|          </motion.div>
+     |          ^
+  152|  
+  153|          {/* Global Noise Texture for HD feel */}
+      at constructor (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:367:19)
+      at TypeScriptParserMixin.raise (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6624:19)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4771:18)
+      at TypeScriptParserMixin.jsxParseElement (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4778:17)
+      at TypeScriptParserMixin.parseExprAtom (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4788:19)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11145:23)
+      at TypeScriptParserMixin.parseUpdate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11130:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11110:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9890:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10963:61)
+      at TypeScriptParserMixin.parseExprOps (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10968:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10945:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10895:21)
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9828:39
+      at TypeScriptParserMixin.tryParse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6932:20)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9828:18)
+      at TypeScriptParserMixin.parseExpressionBase (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10848:23)
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:39
+      at TypeScriptParserMixin.allowInAnd (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12495:16)
+      at TypeScriptParserMixin.parseExpression (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12971:23)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9569:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12843:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12820:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13392:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13385:10)
+      at TypeScriptParserMixin.parseProgram (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12698:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12688:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14568:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10183:18)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14602:38)
+      at parser (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:261:32)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:189:28
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:113:33
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:287:14)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+12:24:01 PM [vite] Pre-transform error: /home/kaust/solvent-ai/frontend/src/components/AuraBackground.tsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (151:8)
+
+  149 | });
+  150 |            <div className="absolute top-[10%] right-[10%] w-[20%] h-[20%] bg-white/50 blur-[12px] rounded-full" />
+> 151 |         </motion.div>
+      |         ^
+  152 |
+  153 |         {/* Global Noise Texture for HD feel */}
+  154 |         <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+12:24:02 PM [vite] Internal server error: /home/kaust/solvent-ai/frontend/src/components/AuraBackground.tsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (151:8)
+
+  149 | });
+  150 |            <div className="absolute top-[10%] right-[10%] w-[20%] h-[20%] bg-white/50 blur-[12px] rounded-full" />
+> 151 |         </motion.div>
+      |         ^
+  152 |
+  153 |         {/* Global Noise Texture for HD feel */}
+  154 |         <div className="absolute inset-0 opacity-[0.05] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+  Plugin: vite:react-babel
+  File: /home/kaust/solvent-ai/frontend/src/components/AuraBackground.tsx:151:8
+  149|  });
+  150|             <div className="absolute top-[10%] right-[10%] w-[20%] h-[20%] bg-white/50 blur-[12px] rounded-full" />
+  151|          </motion.div>
+     |          ^
+  152|  
+  153|          {/* Global Noise Texture for HD feel */}
+      at constructor (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:367:19)
+      at TypeScriptParserMixin.raise (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6624:19)
+      at TypeScriptParserMixin.jsxParseElementAt (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4771:18)
+      at TypeScriptParserMixin.jsxParseElement (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4778:17)
+      at TypeScriptParserMixin.parseExprAtom (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:4788:19)
+      at TypeScriptParserMixin.parseExprSubscripts (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11145:23)
+      at TypeScriptParserMixin.parseUpdate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11130:21)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:11110:23)
+      at TypeScriptParserMixin.parseMaybeUnary (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9890:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10963:61)
+      at TypeScriptParserMixin.parseExprOps (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10968:23)
+      at TypeScriptParserMixin.parseMaybeConditional (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10945:23)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10895:21)
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9828:39
+      at TypeScriptParserMixin.tryParse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:6932:20)
+      at TypeScriptParserMixin.parseMaybeAssign (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9828:18)
+      at TypeScriptParserMixin.parseExpressionBase (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10848:23)
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:39
+      at TypeScriptParserMixin.allowInAnd (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12495:16)
+      at TypeScriptParserMixin.parseExpression (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10844:17)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12971:23)
+      at TypeScriptParserMixin.parseStatementContent (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:9569:18)
+      at TypeScriptParserMixin.parseStatementLike (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12843:17)
+      at TypeScriptParserMixin.parseModuleItem (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12820:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13392:36)
+      at TypeScriptParserMixin.parseBlockBody (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:13385:10)
+      at TypeScriptParserMixin.parseProgram (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12698:10)
+      at TypeScriptParserMixin.parseTopLevel (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:12688:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14568:25)
+      at TypeScriptParserMixin.parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:10183:18)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/@babel/parser/lib/index.js:14602:38)
+      at parser (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/parser/index.js:41:34)
+      at parser.next (<anonymous>)
+      at normalizeFile (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/normalize-file.js:64:37)
+      at normalizeFile.next (<anonymous>)
+      at run (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transformation/index.js:22:50)
+      at run.next (<anonymous>)
+      at transform (/home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/transform.js:22:33)
+      at transform.next (<anonymous>)
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:261:32)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:189:28
+      at /home/kaust/solvent-ai/frontend/node_modules/@babel/core/lib/gensync-utils/async.js:67:7
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:113:33
+      at step (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:287:14)
+      at /home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:273:13
+      at async.call.result.err.err (/home/kaust/solvent-ai/frontend/node_modules/gensync/index.js:223:11)
+12:24:38 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:25:40 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:26:43 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:28:21 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:29:53 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:31:19 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:32:06 PM [vite] hmr update /src/components/AuraBackground.tsx, /src/index.css
+12:33:19 PM [vite] hmr update /src/index.css
+12:33:26 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+12:33:32 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+12:39:40 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+12:40:18 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+12:40:32 PM [vite] hmr update /src/index.css
+12:50:10 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+12:50:10 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+12:54:50 PM [vite] hmr update /src/index.css
+12:55:01 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+12:55:10 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+12:55:23 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+12:57:14 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+12:57:25 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+12:57:35 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+12:58:44 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+12:58:57 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+1:10:23 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+1:11:08 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:07:29 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:07:44 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:08:01 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:08:10 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:29:20 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:29:30 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:29:40 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:33:58 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:34:15 PM [vite] ✨ new dependencies optimized: d3
+2:34:15 PM [vite] ✨ optimized dependencies changed. reloading
+2:34:23 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:35:36 PM [vite] hmr update /src/index.css
+2:35:36 PM [vite] hmr update /src/index.css
+2:35:37 PM [vite] Internal server error: [postcss] /home/kaust/solvent-ai/frontend/src/index.css:152:1: Unexpected }
+  Plugin: vite:css
+  File: /home/kaust/solvent-ai/frontend/src/index.css:152:0
+  150|      @apply absolute bg-slate-500/20 pointer-events-none z-50;
+  151|    }
+  152|  }
+     |  ^
+      at Input.error (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/input.js:135:16)
+      at Parser.unexpectedClose (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:587:22)
+      at Parser.end (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:330:12)
+      at Parser.parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:456:16)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parse.js:11:12)
+      at new LazyResult (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/lazy-result.js:165:16)
+      at Processor.process (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/processor.js:53:14)
+      at compileCSS (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36898:59)
+      at async TransformPluginContext.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36171:11)
+      at async PluginContainer.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+2:35:37 PM [vite] Internal server error: [postcss] /home/kaust/solvent-ai/frontend/src/index.css:152:1: Unexpected }
+  Plugin: vite:css
+  File: /home/kaust/solvent-ai/frontend/src/index.css:152:0
+  150|      @apply absolute bg-slate-500/20 pointer-events-none z-50;
+  151|    }
+  152|  }
+     |  ^
+      at Input.error (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/input.js:135:16)
+      at Parser.unexpectedClose (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:587:22)
+      at Parser.end (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:330:12)
+      at Parser.parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:456:16)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parse.js:11:12)
+      at new LazyResult (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/lazy-result.js:165:16)
+      at Processor.process (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/processor.js:53:14)
+      at compileCSS (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36898:59)
+      at async TransformPluginContext.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36171:11)
+      at async PluginContainer.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+2:36:04 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:36:05 PM [vite] Internal server error: [postcss] /home/kaust/solvent-ai/frontend/src/index.css:152:1: Unexpected }
+  Plugin: vite:css
+  File: /home/kaust/solvent-ai/frontend/src/index.css:152:0
+  150|      @apply absolute bg-slate-500/20 pointer-events-none z-50;
+  151|    }
+  152|  }
+     |  ^
+      at Input.error (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/input.js:135:16)
+      at Parser.unexpectedClose (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:587:22)
+      at Parser.end (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:330:12)
+      at Parser.parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parser.js:456:16)
+      at parse (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/parse.js:11:12)
+      at new LazyResult (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/lazy-result.js:165:16)
+      at Processor.process (/home/kaust/solvent-ai/frontend/node_modules/postcss/lib/processor.js:53:14)
+      at compileCSS (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36898:59)
+      at async TransformPluginContext.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:36171:11)
+      at async PluginContainer.transform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///home/kaust/solvent-ai/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+2:44:46 PM [vite] hmr update /src/index.css
+2:49:35 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:49:45 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:49:54 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:51:53 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx
+2:52:40 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css
+2:52:50 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:53:02 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css
+2:54:02 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:56:37 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx
+2:56:56 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+2:57:12 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+2:57:22 PM [vite] hmr update /src/components/ChatView.tsx, /src/index.css
+3:00:44 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx
+3:00:53 PM [vite] hmr update /src/components/ChatArea.tsx, /src/index.css, /src/components/Navigation.tsx, /src/components/ChatView.tsx, /src/components/KnowledgeMap.tsx, /src/components/SettingsModal.tsx
+3:01:14 PM [vite] hmr update /src/components/SettingsModal.tsx, /src/index.css
+3:01:26 PM [vite] hmr update /src/components/Navigation.tsx, /src/index.css

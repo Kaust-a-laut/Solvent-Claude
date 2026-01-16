@@ -1,0 +1,248 @@
+
+> solvent-ai-backend@1.0.0 dev
+> tsx watch src/server.ts
+
+Server is running on http://0.0.0.0:3001
+[AIController] Attempting Gemini model: gemini-3.0-flash-exp
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash-exp:generateContent: [404 Not Found] models/gemini-3.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+AIController Error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash-exp:generateContent: [404 Not Found] models/gemini-3.0-flash-exp is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:414:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:387:9)
+    at async generateContent (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:832:22)
+    at async ChatSession.sendMessage (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:1146:9)
+    at async GeminiService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/geminiService.ts:39:20)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:199:30) {
+  status: 404,
+  statusText: 'Not Found',
+  errorDetails: undefined
+}
+1:55:57 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+c1:55:58 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Attempting Gemini model: gemini-2.0-flash-exp
+[AIController] Quota exceeded for gemini-2.0-flash-exp. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+AIController Error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:414:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:387:9)
+    at async generateContent (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:832:22)
+    at async ChatSession.sendMessage (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:1146:9)
+    at async GeminiService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/geminiService.ts:39:20)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:199:30) {
+  status: 404,
+  statusText: 'Not Found',
+  errorDetails: undefined
+}
+2:04:58 PM [tsx] change in ./src/services/waterfallService.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Attempting Gemini model: gemini-2.0-flash-exp
+[AIController] Quota exceeded for gemini-2.0-flash-exp. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+AIController Error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:414:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:387:9)
+    at async generateContent (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:832:22)
+    at async ChatSession.sendMessage (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:1146:9)
+    at async GeminiService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/geminiService.ts:39:20)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:199:30) {
+  status: 404,
+  statusText: 'Not Found',
+  errorDetails: undefined
+}
+[AIController] listModels requested
+[AIController] Ollama service not available: fetch failed
+[AIController] Attempting Gemini model: gemini-2.0-flash-exp
+[AIController] Quota exceeded for gemini-2.0-flash-exp. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+AIController Error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:414:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:387:9)
+    at async generateContent (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:832:22)
+    at async ChatSession.sendMessage (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:1146:9)
+    at async GeminiService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/geminiService.ts:39:20)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:199:30) {
+  status: 404,
+  statusText: 'Not Found',
+  errorDetails: undefined
+}
+AIController Error: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14900:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async post (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:135:20)
+    at async Ollama.processStreamableRequest (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:281:22)
+    at async OllamaService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/ollamaService.ts:5:22)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:241:26) {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:11434
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 11434
+  }
+}
+2:11:51 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Chat request received. Body size: 132
+[AIController] Processing chat. Provider: gemini, Model: gemini-2.0-flash-exp, Mode: chat
+[AIController] Attempting Gemini model: gemini-2.0-flash-exp
+[AIController] Quota exceeded for gemini-2.0-flash-exp. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+AIController Error: GoogleGenerativeAIFetchError: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+    at handleResponseNotOk (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:414:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async makeRequest (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:387:9)
+    at async generateContent (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:832:22)
+    at async ChatSession.sendMessage (/home/kaust/solvent-ai/backend/node_modules/@google/generative-ai/dist/index.js:1146:9)
+    at async GeminiService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/geminiService.ts:39:20)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:201:30) {
+  status: 404,
+  statusText: 'Not Found',
+  errorDetails: undefined
+}
+2:12:15 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:12:28 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+c2:12:28 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Chat request received. Body size: 608
+[AIController] Processing chat. Provider: ollama, Model: qwen2.5:3b, Mode: chat
+AIController Error: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14900:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async post (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:135:20)
+    at async Ollama.processStreamableRequest (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:281:22)
+    at async OllamaService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/ollamaService.ts:5:22)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:243:26) {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:11434
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 11434
+  }
+}
+[AIController] listModels requested
+[AIController] Ollama service not available: fetch failed
+[AIController] Chat request received. Body size: 718
+[AIController] Processing chat. Provider: ollama, Model: gemini-2.0-flash-exp, Mode: chat
+AIController Error: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14900:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async post (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:135:20)
+    at async Ollama.processStreamableRequest (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:281:22)
+    at async OllamaService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/ollamaService.ts:5:22)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:243:26) {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:11434
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 11434
+  }
+}
+[AIController] Chat request received. Body size: 193
+[AIController] Processing chat. Provider: gemini, Model: gemini-2.0-flash-exp, Mode: chat
+[AIController] Attempting Gemini model: gemini-2.0-flash-exp
+[AIController] Quota exceeded for gemini-2.0-flash-exp. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Error with gemini-1.5-flash: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.. Trying next...
+[AIController] Attempting Gemini model: gemini-1.5-pro
+[AIController] Error with gemini-1.5-pro: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent: [404 Not Found] models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.. Trying next...
+[AIController] Gemini Chain Failed: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent: [404 Not Found] models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+[AIController] Engaging Local Fallback: qwen2.5:3b
+[AIController] Local Fallback Failed: fetch failed
+AIController Error: Error: Cloud Error: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent: [404 Not Found] models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.. Local Error: fetch failed
+    at chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:236:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+2:28:05 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:30:43 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:30:56 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:32:14 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:33:04 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:33:41 PM [tsx] change in ./src/services/waterfallService.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:34:03 PM [tsx] change in ./src/services/geminiService.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Chat request received. Body size: 193
+[AIController] Processing chat. Provider: gemini, Model: gemini-3-pro-preview, Mode: chat
+[AIController] Attempting Gemini model: gemini-3-pro-preview
+[AIController] Quota exceeded for gemini-3-pro-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-3-flash-preview
+[AIController] Quota exceeded for gemini-3-flash-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-flash-latest
+2:36:35 PM [tsx] change in ./src/services/ollamaService.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:36:48 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+c2:36:48 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:36:59 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+c2:36:59 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:37:14 PM [tsx] change in ./src/services/waterfallService.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Chat request received. Body size: 194
+[AIController] Processing chat. Provider: gemini, Model: gemini-1.5-flash, Mode: undefined
+[AIController] Attempting Gemini model: gemini-1.5-flash
+[AIController] Error with gemini-1.5-flash: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent: [404 Not Found] models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.. Trying next...
+[AIController] Attempting Gemini model: gemini-3-pro-preview
+[AIController] Quota exceeded for gemini-3-pro-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-3-flash-preview
+[AIController] Quota exceeded for gemini-3-flash-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-flash-latest
+[AIController] Chat request received. Body size: 6682
+[AIController] Processing chat. Provider: ollama, Model: qwen2.5:3b, Mode: undefined
+AIController Error: TypeError: fetch failed
+    at node:internal/deps/undici/undici:14900:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async post (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:135:20)
+    at async Ollama.processStreamableRequest (/home/kaust/solvent-ai/backend/node_modules/ollama/dist/browser.cjs:281:22)
+    at async OllamaService.generateChatCompletion (/home/kaust/solvent-ai/backend/src/services/ollamaService.ts:5:22)
+    at async chat (/home/kaust/solvent-ai/backend/src/controllers/aiController.ts:254:26) {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:11434
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16) {
+    errno: -111,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 11434
+  }
+}
+[AIController] Chat request received. Body size: 318
+[AIController] Processing chat. Provider: gemini, Model: gemini-3-pro-preview, Mode: chat
+[AIController] Attempting Gemini model: gemini-3-pro-preview
+[AIController] Quota exceeded for gemini-3-pro-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-3-flash-preview
+[AIController] Quota exceeded for gemini-3-flash-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-flash-latest
+2:41:21 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+c2:41:21 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+2:43:41 PM [tsx] change in ./src/controllers/aiController.ts Restarting...
+cServer is running on http://0.0.0.0:3001
+[AIController] Chat request received. Body size: 205
+[AIController] Processing chat. Provider: gemini, Model: gemini-3-pro-preview, Mode: chat
+[AIController] Attempting Gemini model: gemini-3-pro-preview
+[AIController] Quota exceeded for gemini-3-pro-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-3-flash-preview
+[AIController] Quota exceeded for gemini-3-flash-preview. Trying next...
+[AIController] Attempting Gemini model: gemini-flash-latest
+[AIController] listModels requested
+[AIController] Ollama service not available: fetch failed
+[AIController] listModels requested
+[AIController] Ollama service not available: fetch failed
