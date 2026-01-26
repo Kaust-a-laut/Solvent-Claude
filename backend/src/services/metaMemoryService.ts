@@ -26,7 +26,7 @@ export class MetaMemoryService {
 
     // 2. Perform Cognitive Analysis
     try {
-        const groq = AIProviderFactory.getProvider('groq');
+        const groq = await AIProviderFactory.getProvider('groq');
         
         const prompt = `Act as the Chief Architect of this software project. 
         Review the following log of recent AI interactions, code changes, and memory snippets.

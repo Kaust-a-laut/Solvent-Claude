@@ -1,4 +1,4 @@
-import { Job, DoneCallback } from 'bullmq';
+import { Job } from 'bullmq';
 import { vectorService } from '../services/vectorService';
 import { logger } from '../utils/logger';
 

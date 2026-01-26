@@ -25,7 +25,7 @@ export class SupervisorService {
     logger.info('[Supervisor] Analyzing mission delta via Groq LPU...');
 
     try {
-      const groq = AIProviderFactory.getProvider('groq');
+      const groq = await AIProviderFactory.getProvider('groq');
       
       // Pull relevant long-term context for supervision
       const relevantMemories = await vectorService.search(noteContent, 2);
@@ -142,7 +142,7 @@ export class SupervisorService {
 
       if (!memoryContext) return;
 
-      const groq = AIProviderFactory.getProvider('groq');
+      const groq = await AIProviderFactory.getProvider('groq');
       const prompt = `Act as a Proactive Engineering Guide.
       
       USER CONTEXT: "${contextFocus}"

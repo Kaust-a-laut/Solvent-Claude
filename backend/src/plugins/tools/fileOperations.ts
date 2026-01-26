@@ -12,7 +12,7 @@ export class FileToolPlugin implements IToolPlugin {
     name: 'file_operations',
     description: 'Perform file operations like read, write, list',
     parameters: {
-      type: 'object',
+      type: 'object' as const,
       properties: {
         operation: {
           type: 'string',

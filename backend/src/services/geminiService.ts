@@ -123,10 +123,11 @@ export class GeminiService implements AIProvider {
     }
   }
 
-  async generateVisionContent(prompt: string, imageParts: any[], modelName: string, temperature: number = 0.7, maxTokens: number = 2048, apiKey?: string) {
+  async generateVisionContent(prompt: string, imageParts: any[], options?: any) {
+    const { model: modelName, temperature = 0.7, maxTokens = 2048, apiKey } = options || {};
     const genAI = this.getGenAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: modelName || 'gemini-3-flash-preview',
+      model: modelName || 'gemini-2.0-flash',
       generationConfig: {
         temperature,
         maxOutputTokens: maxTokens,
@@ -136,6 +137,8 @@ export class GeminiService implements AIProvider {
     const response = await result.response;
     return response.text();
   }
+
+  vision = this.generateVisionContent;
 
   async generateImage(prompt: string, modelName: string = 'imagen-3.0-generate-001', apiKey?: string) {
     const genAI = this.getGenAI(apiKey);

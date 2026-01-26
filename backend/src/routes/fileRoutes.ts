@@ -46,7 +46,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // Extract text content based on file type
     if (extension === '.pdf') {
       const dataBuffer = await fs.readFile(filePath);
-      const data = await pdf(dataBuffer);
+      const data = await (pdf as any)(dataBuffer);
       content = data.text;
     } else if (['.docx', '.doc'].includes(extension)) {
       const result = await mammoth.extractRawText({ path: filePath });

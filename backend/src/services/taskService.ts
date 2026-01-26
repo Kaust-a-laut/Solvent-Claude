@@ -98,21 +98,19 @@ export class TaskService {
         let status = 'unknown';
         let progress = 0;
         
-        if (job.active) {
+        if (await job.isActive()) {
           status = 'active';
-          progress = job.progress || 0;
-        } else if (job.completed) {
+          progress = typeof job.progress === 'number' ? job.progress : 0;
+        } else if (await job.isCompleted()) {
           status = 'completed';
           progress = 100;
-        } else if (job.failed) {
+        } else if (await job.isFailed()) {
           status = 'failed';
           progress = 100;
-        } else if (job.delayed) {
+        } else if (await job.isDelayed()) {
           status = 'delayed';
-        } else if (job.waiting) {
+        } else if (await job.isWaiting()) {
           status = 'waiting';
-        } else if (job.paused) {
-          status = 'paused';
         }
         
         let result = undefined;

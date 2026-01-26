@@ -1,7 +1,7 @@
 import { IProviderPlugin } from '../../types/plugins';
 import { ChatMessage, CompletionOptions } from '../../types/ai';
 import { config } from '../../config';
-import { Client } from 'ollama';
+import { Ollama } from 'ollama';
 
 export class OllamaProviderPlugin implements IProviderPlugin {
   id = 'ollama';
@@ -10,12 +10,12 @@ export class OllamaProviderPlugin implements IProviderPlugin {
   version = '1.0.0';
   defaultModel = 'qwen2.5-coder:7b';
 
-  private client: Client | null = null;
+  private client: Ollama | null = null;
   private isInitialized = false;
 
   async initialize(options: Record<string, any>): Promise<void> {
     const host = options.host || config.OLLAMA_HOST || 'http://127.0.0.1:11434';
-    this.client = new Client({ host });
+    this.client = new Ollama({ host });
     this.isInitialized = true;
   }
 

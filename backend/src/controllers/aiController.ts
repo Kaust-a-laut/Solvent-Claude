@@ -100,7 +100,7 @@ export class AIController {
   static async waterfallStep(req: Request, res: Response) {
     try {
       const { step, input, context, globalProvider } = req.body;
-      const result = await aiService.runWaterfallStep(step, input, context, globalProvider);
+      const result = await (aiService as any).runStep(step, input, context, globalProvider);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

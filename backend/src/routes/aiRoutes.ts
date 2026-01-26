@@ -1,12 +1,24 @@
 import { Router } from 'express';
 import { AIController } from '../controllers/aiController';
 import { aiService } from '../services/aiService';
+import { debateService } from '../services/debateService';
 
 const router = Router();
 
 router.post('/chat', AIController.chat);
 router.post('/search', AIController.search);
 router.post('/compare', AIController.compare);
+router.post('/debate', async (req, res) => {
+  const { topic } = req.body;
+  if (!topic) return res.status(400).json({ error: 'Topic is required' });
+  
+  try {
+    const result = await debateService.conductDebate(topic);
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 router.post('/generate-image', AIController.generateImage);
 router.get('/local-image-status', AIController.checkLocalImageStatus);
 router.get('/health/services', AIController.checkHealth);

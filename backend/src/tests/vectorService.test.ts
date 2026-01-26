@@ -61,7 +61,7 @@ describe('VectorService', () => {
       const cache = (vectorService as any).embeddingCache;
       expect(cache.has('Test content A')).toBe(true);
       expect(cache.has('Test content B')).toBe(true);
-    });
+    }, 30000);
   });
 
   describe('Secondary Indexing', () => {

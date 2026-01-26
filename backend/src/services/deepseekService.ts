@@ -5,7 +5,7 @@ export class DeepSeekService extends BaseOpenAIService {
   readonly name = 'deepseek';
   protected baseUrl = 'https://api.deepseek.com';
   protected apiKey: string;
-  protected defaultModel = 'deepseek-chat';
+  public defaultModel = 'deepseek-chat';
 
   constructor() {
     super();

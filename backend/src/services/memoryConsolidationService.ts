@@ -12,7 +12,7 @@ export class MemoryConsolidationService {
     if (messages.length < 4) return; // Only consolidate substantial threads
 
     try {
-      const groq = AIProviderFactory.getProvider('groq');
+      const groq = await AIProviderFactory.getProvider('groq');
       const textToSummarize = messages
         .map(m => `${m.role.toUpperCase()}: ${m.content}`)
         .join('\n\n');
@@ -57,7 +57,7 @@ export class MemoryConsolidationService {
     if (content.length < 50) return;
 
     try {
-      const groq = AIProviderFactory.getProvider('groq');
+      const groq = await AIProviderFactory.getProvider('groq');
       
       // 1. Fetch potentially conflicting existing memories
       const existingContext = await vectorService.search(content, 3, { type: 'permanent_rule' });
@@ -154,7 +154,7 @@ export class MemoryConsolidationService {
     if (olderEpisodic.length < 20) return;
 
     try {
-      const groq = AIProviderFactory.getProvider('groq');
+      const groq = await AIProviderFactory.getProvider('groq');
       const textToCompress = olderEpisodic.map(m => `[${m.metadata.type}] ${m.metadata.text}`).join('\n');
       
       const prompt = `Summarize these older episodic memories into a single, high-density architectural summary. 
@@ -240,7 +240,7 @@ export class MemoryConsolidationService {
 
       while (attempts < maxProviderAttempts) {
         try {
-          const provider = AIProviderFactory.getProvider(providerInfo.name);
+          const provider = await AIProviderFactory.getProvider(providerInfo.name);
           logger.info(`[Memory] Attempting Amnesia Cycle with ${providerInfo.name} (Attempt ${attempts + 1})...`);
           
           const res = await provider.generateChatCompletion([

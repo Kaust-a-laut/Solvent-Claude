@@ -12,7 +12,14 @@ export abstract class BaseOpenAIService implements AIProvider {
   abstract readonly name: string;
   protected abstract baseUrl: string;
   protected abstract apiKey: string;
-  protected defaultModel: string = '';
+  public defaultModel: string = '';
+
+  isReady(): boolean {
+    const key = this.apiKey;
+    return !!key && key.length > 0;
+  }
+
+  complete = this.generateChatCompletion;
 
   protected getToolDefinitions() {
     return getOpenAITools();
