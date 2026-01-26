@@ -5,6 +5,7 @@ import path from 'path';
 import { logger } from '../utils/logger';
 import { CrystallizedMemory, CrystallizedRule, SuccessPattern, SupervisoryInsight } from '../types/memory';
 import { AtomicFileSystem } from '../utils/fileSystem';
+import { BackupManager } from '../utils/backupManager';
 
 interface VectorEntry {
   id: string;
@@ -26,6 +27,9 @@ export class VectorService {
   private readonly SATURATION_THRESHOLD = 200;
   private cacheWriteCounter: number = 0;
   private readonly CACHE_PERSIST_THRESHOLD = 100;
+  private backupManager: BackupManager;
+  private saveCounter: number = 0;
+  private readonly BACKUP_INTERVAL = 50;
 
   // Secondary Indices
   public typeIndex: Map<string, Set<string>> = new Map();
@@ -37,6 +41,11 @@ export class VectorService {
     }
     this.dbPath = path.resolve(__dirname, '../../../.solvent_memory.json');
     this.embeddingCachePath = path.resolve(__dirname, '../../../.solvent_embedding_cache.json');
+    this.backupManager = new BackupManager(
+      this.dbPath,
+      path.resolve(__dirname, '../../../.solvent_backups'),
+      5
+    );
     this.loadMemory();
     this.embeddingCacheLoaded = this.loadEmbeddingCache();
   }
@@ -54,9 +63,34 @@ export class VectorService {
       this.memory = JSON.parse(data);
       this.rebuildIndices();
       logger.info(`Loaded ${this.memory.length} vectors from memory and rebuilt indices.`);
-    } catch (e) {
-      this.memory = [];
+    } catch (e: any) {
+      logger.error(`[VectorService] Failed to load memory: ${e.message}`);
+
+      // Attempt recovery from backup
+      const recovered = await this.attemptRecovery();
+      if (!recovered) {
+        logger.warn('[VectorService] Starting with empty memory.');
+        this.memory = [];
+      }
     }
+  }
+
+  async attemptRecovery(): Promise<boolean> {
+    logger.warn('[VectorService] Attempting recovery from backup...');
+    const restored = await this.backupManager.restoreFromBackup();
+    if (restored) {
+      try {
+        const data = await fs.readFile(this.dbPath, 'utf-8');
+        this.memory = JSON.parse(data);
+        this.rebuildIndices();
+        logger.info(`[VectorService] Recovery successful. Loaded ${this.memory.length} vectors.`);
+        return true;
+      } catch (e) {
+        logger.error('[VectorService] Failed to load restored data');
+        return false;
+      }
+    }
+    return false;
   }
 
   async loadEmbeddingCache() {
@@ -151,21 +185,21 @@ export class VectorService {
 
   private async saveMemory() {
     try {
-      const MAX_ENTRIES = config.MEMORY_MAX_ENTRIES; 
-      
+      const MAX_ENTRIES = config.MEMORY_MAX_ENTRIES;
+
       if (this.memory.length > MAX_ENTRIES) {
         // Smart Eviction: Protect Anchors and Meta-Summaries
-        const critical = this.memory.filter(m => 
-          m.metadata.tier === 'meta-summary' || 
+        const critical = this.memory.filter(m =>
+          m.metadata.tier === 'meta-summary' ||
           m.metadata.isAnchor === true ||
           m.metadata.confidence === 'HIGH'
         );
-        const disposable = this.memory.filter(m => 
-          m.metadata.tier !== 'meta-summary' && 
+        const disposable = this.memory.filter(m =>
+          m.metadata.tier !== 'meta-summary' &&
           m.metadata.isAnchor !== true &&
           m.metadata.confidence !== 'HIGH'
         );
-        
+
         if (critical.length >= MAX_ENTRIES) {
            this.memory = critical.slice(-MAX_ENTRIES);
         } else {
@@ -175,8 +209,17 @@ export class VectorService {
         }
         this.rebuildIndices();
       }
-      
+
       await AtomicFileSystem.writeJson(this.dbPath, this.memory);
+
+      // Periodic backup
+      this.saveCounter++;
+      if (this.saveCounter >= this.BACKUP_INTERVAL) {
+        this.saveCounter = 0;
+        this.backupManager.createBackup().catch(e =>
+          logger.error('[VectorService] Backup creation failed', e)
+        );
+      }
     } catch (error) {
       logger.error('Failed to save vector memory', error);
     }
