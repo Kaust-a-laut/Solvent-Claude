@@ -39,6 +39,7 @@ export class VectorService {
   // Secondary Indices
   public typeIndex: Map<string, Set<string>> = new Map();
   public tagIndex: Map<string, Set<string>> = new Map();
+  public symbolIndex: Map<string, string> = new Map(); // symbol -> entryId
 
   constructor() {
     if (config.GEMINI_API_KEY) {
@@ -192,6 +193,7 @@ export class VectorService {
   private rebuildIndices() {
     this.typeIndex.clear();
     this.tagIndex.clear();
+    this.symbolIndex.clear();
     for (const entry of this.memory) {
       this.addToIndices(entry);
     }
@@ -213,6 +215,14 @@ export class VectorService {
         this.tagIndex.get(tag)!.add(entry.id);
       }
     }
+
+    // Symbol Index
+    const symbols = entry.metadata.symbols;
+    if (Array.isArray(symbols)) {
+      for (const symbol of symbols) {
+        this.symbolIndex.set(symbol, entry.id);
+      }
+    }
   }
 
   private removeFromIndices(id: string) {
@@ -232,6 +242,35 @@ export class VectorService {
         this.tagIndex.get(tag)?.delete(id);
       }
     }
+
+    if (Array.isArray(entry.metadata.symbols)) {
+      for (const symbol of entry.metadata.symbols) {
+        if (this.symbolIndex.get(symbol) === id) {
+          this.symbolIndex.delete(symbol);
+        }
+      }
+    }
+  }
+
+  private extractSymbols(text: string): string[] {
+    const symbols: string[] = [];
+    // Class definitions
+    const classMatches = text.matchAll(/class\s+([a-zA-Z0-9_]+)/g);
+    for (const match of classMatches) symbols.push(match[1]);
+    
+    // Interface definitions
+    const interfaceMatches = text.matchAll(/interface\s+([a-zA-Z0-9_]+)/g);
+    for (const match of interfaceMatches) symbols.push(match[1]);
+
+    // Function definitions
+    const functionMatches = text.matchAll(/function\s+([a-zA-Z0-9_]+)/g);
+    for (const match of functionMatches) symbols.push(match[1]);
+
+    // Exported constants/vars
+    const constMatches = text.matchAll(/export\s+(const|let|var)\s+([a-zA-Z0-9_]+)/g);
+    for (const match of constMatches) symbols.push(match[2]);
+
+    return [...new Set(symbols)];
   }
 
   private async saveMemory() {
@@ -430,6 +469,14 @@ export class VectorService {
     if (!text) return;
     const vector = await this.getEmbedding(text);
     
+    // Normalize links if present
+    let normalizedLinks = metadata.links;
+    if (Array.isArray(metadata.links)) {
+      normalizedLinks = metadata.links.map((link: any) => 
+        typeof link === 'string' ? { targetId: link, type: 'references' } : link
+      );
+    }
+
     const entry: VectorEntry = {
       id: metadata.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
       vector,
@@ -438,7 +485,8 @@ export class VectorService {
         text, 
         tier: metadata.tier || 'episodic',
         createdAt: metadata.createdAt || new Date().toISOString(),
-        status: metadata.status || 'active' 
+        status: metadata.status || 'active',
+        links: normalizedLinks
       }
     };
 
@@ -464,6 +512,14 @@ export class VectorService {
     const ids: string[] = [];
 
     entries.forEach((e, i) => {
+      // Normalize links if present
+      let normalizedLinks = e.metadata.links;
+      if (Array.isArray(e.metadata.links)) {
+        normalizedLinks = e.metadata.links.map((link: any) => 
+          typeof link === 'string' ? { targetId: link, type: 'references' } : link
+        );
+      }
+
       const entry: VectorEntry = {
         id: e.metadata.id || Date.now().toString() + Math.random().toString(36).substr(2, 5) + `_${i}`,
         vector: embeddings[i],
@@ -472,7 +528,8 @@ export class VectorService {
           text: e.text,
           tier: e.metadata.tier || 'episodic',
           createdAt: e.metadata.createdAt || new Date().toISOString(),
-          status: e.metadata.status || 'active'
+          status: e.metadata.status || 'active',
+          links: normalizedLinks
         }
       };
       this.memory.push(entry);
@@ -576,33 +633,203 @@ export class VectorService {
 
     
 
-          await scan(rootPath);
+                    await scan(rootPath);
+
+    
+
+                    
+
+    
+
+                    // Final flush
+
+    
+
+                    if (pendingEntries.length > 0) {
+
+    
+
+                      const addedIds = await this.addEntriesBatch(pendingEntries);
+
+    
+
+                      
+
+    
+
+                      // Second Pass: Resolve links for the newly added entries
+
+    
+
+                      logger.info('[VectorService] Resolving semantic relationships...');
+
+    
+
+                      for (const id of addedIds) {
+
+    
+
+                        const entry = this.memory.find(m => m.id === id);
+
+    
+
+                        if (entry && entry.metadata.type === 'code_block') {
+
+    
+
+                          const links = this.findReferenceTargets(entry.metadata.text, id);
+
+    
+
+                          if (links.length > 0) {
+
+    
+
+                            entry.metadata.links = links;
+
+    
+
+                          }
+
+    
+
+                        }
+
+    
+
+                      }
+
+    
+
+                    }
+
+    
+
+                    
+
+    
+
+                    logger.info('Project indexing completed.');
+
+    
+
+                  } catch (error) {
+
+    
+
+                    logger.error('Error during project indexing', error);
+
+    
+
+                  } finally {
+
+    
+
+                    this.isIndexing = false;
+
+    
+
+                  }
+
+    
+
+                }
+
+    
 
           
 
-          // Final flush
+    
 
-          if (pendingEntries.length > 0) {
+                private findReferenceTargets(text: string, sourceId: string): { targetId: string, type: string }[] {
 
-            await this.addEntriesBatch(pendingEntries);
+    
 
-          }
+                  const links: { targetId: string, type: string }[] = [];
+
+    
+
+                  
+
+    
+
+                  for (const [symbol, targetId] of this.symbolIndex.entries()) {
+
+    
+
+                    // Avoid self-references
+
+    
+
+                    if (targetId === sourceId) continue;
+
+    
 
           
 
-          logger.info('Project indexing completed.');
+    
 
-        } catch (error) {
+                    // match whole words only
 
-          logger.error('Error during project indexing', error);
+    
 
-        } finally {
+                    const symbolRegex = new RegExp(`\\b${symbol}\\b`);
 
-          this.isIndexing = false;
+    
 
-        }
+                    if (symbolRegex.test(text)) {
 
-      }
+    
+
+                      // Rudimentary check for 'implements' or 'extends'
+
+    
+
+                      const depRegex = new RegExp(`(extends|implements|new|import|from)\\s+${symbol}\\b`);
+
+    
+
+                      if (depRegex.test(text)) {
+
+    
+
+                        links.push({ targetId, type: 'depends_on' });
+
+    
+
+                      } else {
+
+    
+
+                        links.push({ targetId, type: 'references' });
+
+    
+
+                      }
+
+    
+
+                    }
+
+    
+
+                  }
+
+    
+
+          
+
+    
+
+                  return links;
+
+    
+
+                }
+
+    
+
+          
 
     
 
@@ -622,51 +849,57 @@ export class VectorService {
 
           if ((currentChunk + block).length > maxChunkSize && currentChunk.length > 0) {
 
-            chunks.push({
+                        chunks.push({
 
-              text: currentChunk,
+                          text: currentChunk,
 
-              metadata: { 
+                          metadata: { 
 
-                filePath: path.relative(process.cwd(), filePath),
+                            filePath: path.relative(process.cwd(), filePath),
 
-                type: 'code_block',
+                            type: 'code_block',
 
-                tier: 'episodic'
+                            tier: 'episodic',
 
-              }
+                            symbols: this.extractSymbols(currentChunk)
 
-            });
+                          }
 
-            currentChunk = "";
+                        });
 
-          }
+                        currentChunk = "";
 
-          currentChunk += (currentChunk ? "\n\n" : "") + block;
+                      }
 
-        }
+                      currentChunk += (currentChunk ? "\n\n" : "") + block;
 
-    
+                    }
 
-        if (currentChunk.trim().length > 0) {
+                
 
-          chunks.push({
+                    if (currentChunk.trim().length > 0) {
 
-            text: currentChunk,
+                      chunks.push({
 
-            metadata: { 
+                        text: currentChunk,
 
-              filePath: path.relative(process.cwd(), filePath),
+                        metadata: { 
 
-              type: 'code_block',
+                          filePath: path.relative(process.cwd(), filePath),
 
-              tier: 'episodic'
+                          type: 'code_block',
 
-            }
+                          tier: 'episodic',
 
-          });
+                          symbols: this.extractSymbols(currentChunk)
 
-        }
+                        }
+
+                      });
+
+                    }
+
+            
 
         return chunks;
 
@@ -818,21 +1051,61 @@ export class VectorService {
 
             })
 
-            .sort((a, b) => b.score - a.score)
+                  .sort((a, b) => b.score - a.score)
 
-            .slice(0, limit);
+                  .slice(0, limit);
 
-      
+            
 
-            const latency = Date.now() - startTime;
+                  // --- GRAPH-AUGMENTED RETRIEVAL (One-hop expansion) ---
 
-            memoryMetrics.recordRetrieval(latency, candidates.length, results.length);
+                  const expandedResults = [...results];
 
-      
+                  for (const entry of results) {
 
-            return results;
+                    if (entry.metadata.links && Array.isArray(entry.metadata.links)) {
 
-          } catch (error) {
+                      for (const link of entry.metadata.links) {
+
+                        // Only add if not already in results
+
+                        if (!expandedResults.find(r => r.id === link.targetId)) {
+
+                          const targetEntry = this.memory.find(m => m.id === link.targetId);
+
+                          if (targetEntry) {
+
+                            // Add with slightly lower score than its parent
+
+                            expandedResults.push({ ...targetEntry, score: entry.score * 0.8 });
+
+                          }
+
+                        }
+
+                      }
+
+                    }
+
+                  }
+
+            
+
+                  const finalResults = expandedResults.sort((a, b) => b.score - a.score).slice(0, limit + 2); // Allow small over-retrieval for context
+
+            
+
+                  const latency = Date.now() - startTime;
+
+                  memoryMetrics.recordRetrieval(latency, candidates.length, finalResults.length);
+
+            
+
+                  return finalResults;
+
+                } catch (error) {
+
+            
 
       
 

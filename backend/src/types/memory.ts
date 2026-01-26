@@ -1,14 +1,23 @@
 export type MemoryConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
 export type MemoryStatus = 'active' | 'flagged_for_review' | 'deprecated';
 
+export type SemanticLinkType = 'import' | 'implements' | 'calls' | 'depends_on' | 'references';
+
+export interface SemanticLink {
+  targetId: string;
+  type: SemanticLinkType;
+  description?: string;
+}
+
 export interface BaseMemory {
   id?: string;
   createdAt: string;
   tags: string[];
   confidence: MemoryConfidence;
   source: 'chat' | 'waterfall' | 'supervisor' | 'user_override';
-  status?: MemoryStatus; // Default to 'active' if undefined
-  deprecatedBy?: string; // ID of the memory that superseded this one
+  status?: MemoryStatus;
+  deprecatedBy?: string;
+  links?: SemanticLink[];
 }
 
 export interface CrystallizedRule extends BaseMemory {

@@ -215,10 +215,58 @@ describe('VectorService', () => {
       });
       
       // Verify the main entry has links
-      const memory = (vectorService as any).memory;
-      const mainEntry = memory.find((m: any) => m.id === 'main-1');
-      expect(mainEntry.metadata.links).toContain('related-1');
-      expect(mainEntry.metadata.links).toContain('related-2');
+             const memory = (vectorService as any).memory;
+             const mainEntry = memory.find((m: any) => m.id === 'main-1');
+             expect(mainEntry.metadata.links).toBeDefined();
+             expect(mainEntry.metadata.links.some((l: any) => l.targetId === 'related-1')).toBe(true);
+          });
+      
+  });
+
+  describe('Semantic Graph (RAG++)', () => {
+    it('should extract symbols and resolve links during indexing', async () => {
+      // Create two related code blocks
+      const code1 = 'export interface IService { execute(): void; }';
+      const code2 = 'export class Service implements IService { execute() {} }';
+      
+      // We need to simulate the project indexing or manually use the methods
+      // For simplicity, manually add them and check links
+      
+      const id1 = await vectorService.addEntry(code1, { type: 'code_block', symbols: ['IService'] });
+      const id2 = await vectorService.addEntry(code2, { type: 'code_block', symbols: ['Service'] });
+      
+      // Manually trigger link resolution (as indexProject would do in its second pass)
+      const entry2 = (vectorService as any).memory.find((m: any) => m.id === id2);
+      const links = (vectorService as any).findReferenceTargets(code2, id2);
+      entry2.metadata.links = links;
+
+      expect(links.length).toBeGreaterThan(0);
+      expect(links.some((l: any) => l.targetId === id1)).toBe(true);
+    });
+
+    it('should expand search results with linked memories', async () => {
+      const codeInterface = 'export interface ILogger { log(msg: string): void; }';
+      const codeImpl = 'export class ConsoleLogger implements ILogger { log(msg: string) { console.log(msg); } }';
+      
+      const idInterface = await vectorService.addEntry(codeInterface, { 
+        type: 'code_block', 
+        symbols: ['ILogger'],
+        tier: 'episodic' 
+      });
+      
+      const idImpl = await vectorService.addEntry(codeImpl, { 
+        type: 'code_block', 
+        symbols: ['ConsoleLogger'],
+        links: [{ targetId: idInterface, type: 'depends_on' }],
+        tier: 'episodic'
+      });
+
+      // Search for the implementation
+      const results = await vectorService.search('ConsoleLogger implementation', 1);
+      
+      // Should find the implementation AND expand to include the interface
+      expect(results.some(r => r.id === idImpl)).toBe(true);
+      expect(results.some(r => r.id === idInterface)).toBe(true);
     });
   });
 });
