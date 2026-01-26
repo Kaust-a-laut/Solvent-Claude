@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { IProviderPlugin, IToolPlugin } from '../types/plugins';
+import { IProviderPlugin, IToolPlugin, ProviderCapabilities } from '../types/plugins';
 import { logger } from '../utils/logger';
 
 export interface PluginRegistry {
@@ -221,16 +221,81 @@ export class PluginManager {
     return { ...this.registry }; // Return a copy to prevent external mutations
   }
 
+  /**
+   * Resolve the best available provider using 3-tier fallback:
+   * 1. Explicit request (if provided and ready)
+   * 2. Default provider from config (if ready)
+   * 3. First available ready provider
+   *
+   * @param requested - Explicitly requested provider ID
+   * @param defaultProvider - Default provider ID (falls back to config.DEFAULT_PROVIDER)
+   * @param requiredCapabilities - Optional capabilities filter
+   */
+  async resolveProvider(
+    requested?: string,
+    defaultProvider?: string,
+    requiredCapabilities?: Partial<ProviderCapabilities>
+  ): Promise<IProviderPlugin> {
+    const { config } = await import('../config');
+    const effectiveDefault = defaultProvider || config.DEFAULT_PROVIDER;
+
+    // Helper to check if provider meets capability requirements
+    const meetsCapabilities = (provider: IProviderPlugin): boolean => {
+      if (!requiredCapabilities) return true;
+      const caps = provider.capabilities || {};
+
+      for (const [key, value] of Object.entries(requiredCapabilities)) {
+        const capValue = caps[key as keyof ProviderCapabilities];
+        if (value === true && !capValue) {
+          return false;
+        }
+        if (typeof value === 'number' && typeof capValue === 'number' && capValue < value) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    // 1. Try explicitly requested provider
+    if (requested) {
+      const plugin = this.registry.providers.get(requested);
+      if (plugin && plugin.isReady() && meetsCapabilities(plugin)) {
+        logger.debug(`[PluginManager] Resolved explicit provider: ${requested}`);
+        return plugin;
+      }
+      logger.warn(`[PluginManager] Requested provider ${requested} not ready or missing capabilities`);
+    }
+
+    // 2. Try default provider
+    if (effectiveDefault) {
+      const plugin = this.registry.providers.get(effectiveDefault);
+      if (plugin && plugin.isReady() && meetsCapabilities(plugin)) {
+        logger.debug(`[PluginManager] Resolved default provider: ${effectiveDefault}`);
+        return plugin;
+      }
+    }
+
+    // 3. Find first ready provider that meets capabilities
+    for (const provider of this.registry.providers.values()) {
+      if (provider.isReady() && meetsCapabilities(provider)) {
+        logger.info(`[PluginManager] Resolved fallback provider: ${provider.id}`);
+        return provider;
+      }
+    }
+
+    throw new Error('No operational AI providers found in the plugin system.');
+  }
+
   async reload(): Promise<void> {
     logger.info('[PluginManager] Reloading all plugins...');
-    
+
     // Clear current registry
     this.registry.providers.clear();
     this.registry.tools.clear();
-    
+
     // Reload all plugins
     await this.loadAllPlugins();
-    
+
     logger.info('[PluginManager] Plugins reloaded successfully');
   }
 }

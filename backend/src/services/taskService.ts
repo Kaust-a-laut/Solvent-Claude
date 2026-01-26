@@ -6,7 +6,8 @@ export enum TaskQueue {
   DEFAULT = 'default',
   INDEXING = 'indexing',
   MEMORY_GARDENING = 'memory_gardening',
-  IMAGE_GEN = 'image_gen'
+  IMAGE_GEN = 'image_gen',
+  ORCHESTRATION = 'orchestration'
 }
 
 export interface TaskPayload {
@@ -86,6 +87,30 @@ export class TaskService {
       TaskQueue.IMAGE_GEN,
       'image-generation',
       { type: 'image-generation', data: { prompt, model } },
+      opts
+    );
+  }
+
+  async dispatchOrchestrationJob(
+    templateId: string,
+    goal: string,
+    template: any,
+    options?: { providerOverride?: string; modelOverride?: string },
+    opts?: any
+  ): Promise<string> {
+    return this.dispatchJob(
+      TaskQueue.ORCHESTRATION,
+      'orchestration-mission',
+      {
+        type: 'orchestration-mission',
+        data: {
+          templateId,
+          goal,
+          template,
+          providerOverride: options?.providerOverride,
+          modelOverride: options?.modelOverride
+        }
+      },
       opts
     );
   }

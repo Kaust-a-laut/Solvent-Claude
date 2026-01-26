@@ -9,6 +9,14 @@ export class GeminiProviderPlugin implements IProviderPlugin {
   description = 'Google\'s Gemini AI provider';
   version = '1.0.0';
   defaultModel = 'gemini-1.5-flash';
+  capabilities = {
+    supportsVision: true,
+    supportsStreaming: true,
+    supportsEmbeddings: true,
+    contextWindow: 1000000,  // Gemini 1.5 Pro
+    maxOutputTokens: 8192,
+    supportsFunctionCalling: true
+  };
 
   private genAI: GoogleGenerativeAI | null = null;
   private isInitialized = false;

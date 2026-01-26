@@ -9,6 +9,14 @@ export class OllamaProviderPlugin implements IProviderPlugin {
   description = 'Local Ollama AI provider';
   version = '1.0.0';
   defaultModel = 'qwen2.5-coder:7b';
+  capabilities = {
+    supportsVision: false,  // Depends on model
+    supportsStreaming: true,
+    supportsEmbeddings: false,
+    contextWindow: 32768,  // Varies by model
+    maxOutputTokens: 4096,
+    supportsFunctionCalling: false
+  };
 
   private client: Ollama | null = null;
   private isInitialized = false;

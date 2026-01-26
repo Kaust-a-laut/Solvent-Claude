@@ -20,27 +20,45 @@ export interface IPlugin {
   isReady(): boolean;
 }
 
+export interface ProviderCapabilities {
+  /** Supports vision/image input */
+  supportsVision?: boolean;
+  /** Supports streaming responses */
+  supportsStreaming?: boolean;
+  /** Supports embedding generation */
+  supportsEmbeddings?: boolean;
+  /** Maximum context window in tokens */
+  contextWindow?: number;
+  /** Maximum output tokens */
+  maxOutputTokens?: number;
+  /** Supports function/tool calling */
+  supportsFunctionCalling?: boolean;
+}
+
 export interface IProviderPlugin extends IPlugin {
   /** Default model for this provider */
   defaultModel?: string;
-  
+
+  /** Provider capabilities */
+  capabilities?: ProviderCapabilities;
+
   /** Generate a completion */
   complete(
     messages: ChatMessage[],
     options: CompletionOptions
   ): Promise<string>;
-  
+
   /** Generate a streaming completion */
   stream?(
     messages: ChatMessage[],
     options: CompletionOptions
   ): AsyncGenerator<string>;
-  
+
   /** Generate embeddings */
   embed?(
     text: string
   ): Promise<number[]>;
-  
+
   /** Generate vision content */
   vision?(
     prompt: string,

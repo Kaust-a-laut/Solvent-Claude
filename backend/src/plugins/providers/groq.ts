@@ -9,6 +9,14 @@ export class GroqProviderPlugin implements IProviderPlugin {
   description = 'Groq cloud-based AI provider';
   version = '1.0.0';
   defaultModel = 'llama-3.3-70b-versatile';
+  capabilities = {
+    supportsVision: false,
+    supportsStreaming: true,
+    supportsEmbeddings: false,
+    contextWindow: 128000,
+    maxOutputTokens: 8192,
+    supportsFunctionCalling: true
+  };
 
   private isInitialized = false;
   private apiKey: string | null = null;
