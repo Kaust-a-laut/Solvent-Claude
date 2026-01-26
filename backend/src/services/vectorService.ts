@@ -1,0 +1,740 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { config } from '../config';
+import fs from 'fs/promises';
+import path from 'path';
+import { logger } from '../utils/logger';
+import { CrystallizedMemory, CrystallizedRule, SuccessPattern, SupervisoryInsight } from '../types/memory';
+import { AtomicFileSystem } from '../utils/fileSystem';
+
+interface VectorEntry {
+  id: string;
+  vector: number[];
+  metadata: any; 
+}
+
+export type MemoryTier = 'episodic' | 'crystallized' | 'meta-summary' | 'archived';
+
+export class VectorService {
+  private genAI: GoogleGenerativeAI | null = null;
+  private dbPath: string;
+  private embeddingCachePath: string;
+  private memory: VectorEntry[] = [];
+  private isIndexing: boolean = false;
+  private embeddingCache: Map<string, { vector: number[], lastAccess: number }> = new Map();
+  private embeddingCacheLoaded: Promise<void>;
+  private newEntriesSinceLastDream: number = 0;
+  private readonly SATURATION_THRESHOLD = 200;
+  private cacheWriteCounter: number = 0;
+  private readonly CACHE_PERSIST_THRESHOLD = 100;
+
+  // Secondary Indices
+  public typeIndex: Map<string, Set<string>> = new Map();
+  public tagIndex: Map<string, Set<string>> = new Map();
+
+  constructor() {
+    if (config.GEMINI_API_KEY) {
+      this.genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+    }
+    this.dbPath = path.resolve(__dirname, '../../../.solvent_memory.json');
+    this.embeddingCachePath = path.resolve(__dirname, '../../../.solvent_embedding_cache.json');
+    this.loadMemory();
+    this.embeddingCacheLoaded = this.loadEmbeddingCache();
+  }
+
+  private getGenAI(): GoogleGenerativeAI {
+    if (!this.genAI) {
+      throw new Error('Gemini API Key missing for Vector Service.');
+    }
+    return this.genAI;
+  }
+
+  private async loadMemory() {
+    try {
+      const data = await fs.readFile(this.dbPath, 'utf-8');
+      this.memory = JSON.parse(data);
+      this.rebuildIndices();
+      logger.info(`Loaded ${this.memory.length} vectors from memory and rebuilt indices.`);
+    } catch (e) {
+      this.memory = [];
+    }
+  }
+
+  async loadEmbeddingCache() {
+    try {
+      const data = await fs.readFile(this.embeddingCachePath, 'utf-8');
+      const parsed = JSON.parse(data);
+
+      // Validate structure
+      if (!Array.isArray(parsed)) {
+        logger.warn('[VectorService] Embedding cache file has invalid format, starting fresh.');
+        return;
+      }
+
+      this.embeddingCache.clear();
+      let loadedCount = 0;
+      for (const entry of parsed) {
+        // Validate each entry has required fields
+        if (entry && typeof entry.text === 'string' && Array.isArray(entry.vector)) {
+          this.embeddingCache.set(entry.text, {
+            vector: entry.vector,
+            lastAccess: entry.lastAccess || Date.now()
+          });
+          loadedCount++;
+        }
+      }
+      logger.info(`[VectorService] Loaded ${loadedCount} cached embeddings from disk.`);
+    } catch (e: any) {
+      if (e.code === 'ENOENT') {
+        // File doesn't exist yet, that's fine
+        logger.debug('[VectorService] No embedding cache file found, starting fresh.');
+      } else {
+        // JSON parse error or other issue
+        logger.warn(`[VectorService] Failed to load embedding cache: ${e.message}. Starting fresh.`);
+      }
+    }
+  }
+
+  async persistEmbeddingCache() {
+    try {
+      const entries = Array.from(this.embeddingCache.entries()).map(([text, { vector, lastAccess }]) => ({
+        text,
+        vector,
+        lastAccess
+      }));
+      await AtomicFileSystem.writeJson(this.embeddingCachePath, entries);
+      logger.info(`[VectorService] Persisted ${entries.length} embeddings to cache file.`);
+    } catch (error) {
+      logger.error('[VectorService] Failed to persist embedding cache', error);
+    }
+  }
+
+  private rebuildIndices() {
+    this.typeIndex.clear();
+    this.tagIndex.clear();
+    for (const entry of this.memory) {
+      this.addToIndices(entry);
+    }
+  }
+
+  private addToIndices(entry: VectorEntry) {
+    // Type Index
+    const type = entry.metadata.type;
+    if (type) {
+      if (!this.typeIndex.has(type)) this.typeIndex.set(type, new Set());
+      this.typeIndex.get(type)!.add(entry.id);
+    }
+
+    // Tag Index
+    const tags = entry.metadata.tags;
+    if (Array.isArray(tags)) {
+      for (const tag of tags) {
+        if (!this.tagIndex.has(tag)) this.tagIndex.set(tag, new Set());
+        this.tagIndex.get(tag)!.add(entry.id);
+      }
+    }
+  }
+
+  private removeFromIndices(id: string) {
+    const entry = this.memory.find(m => m.id === id);
+    if (!entry) return;
+
+    if (entry.metadata.type) {
+      this.typeIndex.get(entry.metadata.type)?.delete(id);
+    }
+
+    if (Array.isArray(entry.metadata.tags)) {
+      for (const tag of entry.metadata.tags) {
+        this.tagIndex.get(tag)?.delete(id);
+      }
+    }
+  }
+
+  private async saveMemory() {
+    try {
+      const MAX_ENTRIES = config.MEMORY_MAX_ENTRIES; 
+      
+      if (this.memory.length > MAX_ENTRIES) {
+        // Smart Eviction: Protect Anchors and Meta-Summaries
+        const critical = this.memory.filter(m => 
+          m.metadata.tier === 'meta-summary' || 
+          m.metadata.isAnchor === true ||
+          m.metadata.confidence === 'HIGH'
+        );
+        const disposable = this.memory.filter(m => 
+          m.metadata.tier !== 'meta-summary' && 
+          m.metadata.isAnchor !== true &&
+          m.metadata.confidence !== 'HIGH'
+        );
+        
+        if (critical.length >= MAX_ENTRIES) {
+           this.memory = critical.slice(-MAX_ENTRIES);
+        } else {
+           const slotsLeft = MAX_ENTRIES - critical.length;
+           const keptDisposable = disposable.slice(-slotsLeft);
+           this.memory = [...critical, ...keptDisposable];
+        }
+        this.rebuildIndices();
+      }
+      
+      await AtomicFileSystem.writeJson(this.dbPath, this.memory);
+    } catch (error) {
+      logger.error('Failed to save vector memory', error);
+    }
+  }
+
+  // --- TYPED STORAGE METHODS ---
+
+  async saveRule(rule: any) {
+    const entry = {
+      ...rule,
+      tier: 'crystallized' as MemoryTier,
+      isAnchor: true,
+      importance: 5,
+      type: 'permanent_rule',
+      id: `rule_${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    return this.addEntry(rule.ruleText, entry);
+  }
+
+  async savePattern(pattern: any) {
+    const entry = {
+      ...pattern,
+      tier: 'crystallized' as MemoryTier,
+      type: 'solution_pattern',
+      id: `pattern_${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    return this.addEntry(`${pattern.problemDomain}\n${pattern.solutionCode}`, entry);
+  }
+
+  async saveInsight(insight: any) {
+    const entry = {
+      ...insight,
+      tier: 'crystallized' as MemoryTier,
+      isAnchor: true,
+      type: 'architectural_decision',
+      id: `insight_${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    return this.addEntry(`${insight.decision}\n${insight.rationale}`, entry);
+  }
+
+  // --- CORE METHODS ---
+
+  async getEmbedding(text: string): Promise<number[]> {
+    await this.embeddingCacheLoaded; // Ensure cache is loaded
+    if (!text || text.trim().length === 0) return new Array(768).fill(0);
+
+    const cached = this.embeddingCache.get(text);
+    if (cached) {
+      cached.lastAccess = Date.now();
+      return cached.vector;
+    }
+
+    try {
+      const genAI = this.getGenAI();
+      const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+      const result = await model.embedContent(text);
+      const values = result.embedding.values;
+      
+      this.cacheEmbedding(text, values);
+      
+      return values;
+    } catch (err) {
+      logger.error('Embedding generation failed:', err);
+      return new Array(768).fill(0);
+    }
+  }
+
+  async batchGetEmbeddings(texts: string[]): Promise<number[][]> {
+    const results: number[][] = new Array(texts.length);
+    const missingIndices: number[] = [];
+    const missingTexts: string[] = [];
+
+    texts.forEach((text, i) => {
+      if (!text || text.trim().length === 0) {
+        results[i] = new Array(768).fill(0);
+      } else {
+        const cached = this.embeddingCache.get(text);
+        if (cached) {
+          cached.lastAccess = Date.now();
+          results[i] = cached.vector;
+        } else {
+          missingIndices.push(i);
+          missingTexts.push(text);
+        }
+      }
+    });
+
+    if (missingTexts.length > 0) {
+      try {
+        const genAI = this.getGenAI();
+        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+        
+        // Google SDK batchEmbedContents
+        const batchSize = 100; // API limit usually
+        for (let i = 0; i < missingTexts.length; i += batchSize) {
+          const chunk = missingTexts.slice(i, i + batchSize);
+          const response = await model.batchEmbedContents({
+            requests: chunk.map(t => ({ content: { role: 'user', parts: [{ text: t }] } }))
+          });
+          
+          response.embeddings.forEach((emb, j) => {
+            const originalIndex = missingIndices[i + j];
+            results[originalIndex] = emb.values;
+            this.cacheEmbedding(chunk[j], emb.values);
+          });
+        }
+      } catch (err) {
+        logger.error('Batch embedding generation failed:', err);
+        missingIndices.forEach(idx => {
+          if (!results[idx]) results[idx] = new Array(768).fill(0);
+        });
+      }
+    }
+
+    return results;
+  }
+
+  private cacheEmbedding(text: string, vector: number[]) {
+    const MAX_CACHE = config.MEMORY_CACHE_SIZE;
+    if (this.embeddingCache.size >= MAX_CACHE) {
+      // LRU Eviction
+      let oldestKey: string | null = null;
+      let oldestTime = Infinity;
+      for (const [key, val] of this.embeddingCache.entries()) {
+        if (val.lastAccess < oldestTime) {
+          oldestTime = val.lastAccess;
+          oldestKey = key;
+        }
+      }
+      if (oldestKey) this.embeddingCache.delete(oldestKey);
+    }
+    this.embeddingCache.set(text, { vector, lastAccess: Date.now() });
+
+    // Periodic persistence
+    this.cacheWriteCounter++;
+    if (this.cacheWriteCounter >= this.CACHE_PERSIST_THRESHOLD) {
+      this.cacheWriteCounter = 0;
+      this.persistEmbeddingCache().catch(e => logger.error('[VectorService] Cache persist failed', e));
+    }
+  }
+
+  async addEntry(text: string, metadata: any) {
+    if (!text) return;
+    const vector = await this.getEmbedding(text);
+    
+    const entry: VectorEntry = {
+      id: metadata.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      vector,
+      metadata: { 
+        ...metadata, 
+        text, 
+        tier: metadata.tier || 'episodic',
+        createdAt: metadata.createdAt || new Date().toISOString(),
+        status: metadata.status || 'active' 
+      }
+    };
+
+    this.memory.push(entry);
+    this.addToIndices(entry);
+    this.newEntriesSinceLastDream++;
+
+    if (this.newEntriesSinceLastDream >= this.SATURATION_THRESHOLD) {
+      this.triggerAmnesiaCycle();
+    }
+
+    await this.saveMemory();
+    return entry.id;
+  }
+
+  async addEntriesBatch(entries: { text: string, metadata: any }[]) {
+    if (entries.length === 0) return [];
+
+    const embeddings = await this.batchGetEmbeddings(entries.map(e => e.text));
+    const ids: string[] = [];
+
+    entries.forEach((e, i) => {
+      const entry: VectorEntry = {
+        id: e.metadata.id || Date.now().toString() + Math.random().toString(36).substr(2, 5) + `_${i}`,
+        vector: embeddings[i],
+        metadata: {
+          ...e.metadata,
+          text: e.text,
+          tier: e.metadata.tier || 'episodic',
+          createdAt: e.metadata.createdAt || new Date().toISOString(),
+          status: e.metadata.status || 'active'
+        }
+      };
+      this.memory.push(entry);
+      this.addToIndices(entry);
+      ids.push(entry.id);
+    });
+
+    this.newEntriesSinceLastDream += entries.length;
+    if (this.newEntriesSinceLastDream >= this.SATURATION_THRESHOLD) {
+      this.triggerAmnesiaCycle();
+    }
+
+        await this.saveMemory();
+
+        return ids;
+
+      }
+
+    
+
+      async indexProject(rootPath: string) {
+
+        if (this.isIndexing) {
+
+          logger.warn('Indexing already in progress.');
+
+          return;
+
+        }
+
+        this.isIndexing = true;
+
+        logger.info(`Starting project indexing: ${rootPath}`);
+
+        
+
+        try {
+
+          const ignoredDirs = ['node_modules', '.git', 'dist', 'build', '.next', 'out', 'generated_images'];
+
+          const extensions = ['.ts', '.tsx', '.js', '.jsx', '.md', '.txt', '.py', '.json'];
+
+          const pendingEntries: { text: string, metadata: any }[] = [];
+
+    
+
+          const scan = async (dir: string) => {
+
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+
+            for (const entry of entries) {
+
+              const fullPath = path.join(dir, entry.name);
+
+              if (entry.isDirectory()) {
+
+                if (!ignoredDirs.includes(entry.name)) {
+
+                  await scan(fullPath);
+
+                }
+
+              } else {
+
+                const ext = path.extname(entry.name).toLowerCase();
+
+                if (extensions.includes(ext)) {
+
+                  const content = await fs.readFile(fullPath, 'utf-8');
+
+                  if (content.trim().length > 10) {
+
+                    // Collect chunks for batching
+
+                    const chunks = this.chunkFile(content, fullPath);
+
+                    pendingEntries.push(...chunks);
+
+                    
+
+                    // Process in batches of 20 to avoid memory/API limits
+
+                    if (pendingEntries.length >= 20) {
+
+                      await this.addEntriesBatch(pendingEntries.splice(0, 20));
+
+                    }
+
+                  }
+
+                }
+
+              }
+
+            }
+
+          };
+
+    
+
+          await scan(rootPath);
+
+          
+
+          // Final flush
+
+          if (pendingEntries.length > 0) {
+
+            await this.addEntriesBatch(pendingEntries);
+
+          }
+
+          
+
+          logger.info('Project indexing completed.');
+
+        } catch (error) {
+
+          logger.error('Error during project indexing', error);
+
+        } finally {
+
+          this.isIndexing = false;
+
+        }
+
+      }
+
+    
+
+      private chunkFile(content: string, filePath: string): { text: string, metadata: any }[] {
+
+        const blocks = content.split(/\n\n+/);
+
+        const chunks: { text: string, metadata: any }[] = [];
+
+        let currentChunk = "";
+
+        const maxChunkSize = 1200;
+
+    
+
+        for (const block of blocks) {
+
+          if ((currentChunk + block).length > maxChunkSize && currentChunk.length > 0) {
+
+            chunks.push({
+
+              text: currentChunk,
+
+              metadata: { 
+
+                filePath: path.relative(process.cwd(), filePath),
+
+                type: 'code_block',
+
+                tier: 'episodic'
+
+              }
+
+            });
+
+            currentChunk = "";
+
+          }
+
+          currentChunk += (currentChunk ? "\n\n" : "") + block;
+
+        }
+
+    
+
+        if (currentChunk.trim().length > 0) {
+
+          chunks.push({
+
+            text: currentChunk,
+
+            metadata: { 
+
+              filePath: path.relative(process.cwd(), filePath),
+
+              type: 'code_block',
+
+              tier: 'episodic'
+
+            }
+
+          });
+
+        }
+
+        return chunks;
+
+      }
+
+    
+
+      private triggerAmnesiaCycle() {
+        this.newEntriesSinceLastDream = 0;
+        // Use task service to schedule maintenance instead of running inline
+        import('./taskService').then(({ taskService }) => {
+          taskService.scheduleMaintenance().catch((e: any) =>
+            logger.error('[VectorService] Maintenance scheduling failed', e)
+          );
+        }).catch((e: any) =>
+          logger.error('[VectorService] Failed to import taskService', e)
+        );
+      }
+
+    async updateEntry(id: string, updates: any) {
+      const index = this.memory.findIndex(m => m.id === id);
+      if (index === -1) return false;
+  
+      const oldEntry = { ...this.memory[index] };
+      this.removeFromIndices(id);
+
+      this.memory[index].metadata = {
+        ...this.memory[index].metadata,
+        ...updates
+      };
+
+      this.addToIndices(this.memory[index]);
+      await this.saveMemory();
+      return true;
+    }
+  
+    async deprecateEntry(id: string, reason: string) {
+      const index = this.memory.findIndex(m => m.id === id);
+      if (index === -1) return false;
+  
+      this.memory[index].metadata = {
+        ...this.memory[index].metadata,
+        status: 'deprecated',
+        deprecationReason: reason,
+        deprecatedAt: new Date().toISOString()
+      };
+      
+      logger.info(`[Gardening] Deprecated entry ${id}. Reason: ${reason}`);
+      await this.saveMemory();
+      return true;
+    }
+
+  async search(query: string, limit: number = 5, filter?: { type?: string, tier?: MemoryTier, tags?: string[], includeDeprecated?: boolean }) {
+    try {
+      const queryVector = await this.getEmbedding(query);
+      let candidates: VectorEntry[] = [];
+
+      // Use indices if filter is specific enough
+      if (filter?.type && this.typeIndex.has(filter.type)) {
+        const ids = this.typeIndex.get(filter.type)!;
+        candidates = this.memory.filter(m => ids.has(m.id));
+      } else if (filter?.tags && filter.tags.length > 0) {
+        // Find intersection or union of tags. Using union for broader recall.
+        const candidateIds = new Set<string>();
+        for (const tag of filter.tags) {
+          if (this.tagIndex.has(tag)) {
+            this.tagIndex.get(tag)!.forEach(id => candidateIds.add(id));
+          }
+        }
+        candidates = this.memory.filter(m => candidateIds.has(m.id));
+      } else {
+        candidates = this.memory;
+      }
+
+      if (!filter?.includeDeprecated) {
+        candidates = candidates.filter(m => m.metadata.status !== 'deprecated');
+      }
+
+      if (filter) {
+        if (filter.type && candidates.length === this.memory.length) {
+            candidates = candidates.filter(m => m.metadata.type === filter.type);
+        }
+        if (filter.tier) candidates = candidates.filter(m => m.metadata.tier === filter.tier);
+        if (filter.tags && filter.tags.length > 0 && candidates.length === this.memory.length) {
+          candidates = candidates.filter(m => 
+            m.metadata.tags && filter.tags!.some(t => m.metadata.tags.includes(t))
+          );
+        }
+      }
+
+      const DECAY_LAMBDA = 0.05; // Relevance halves every ~14 days
+
+
+
+      const results = candidates.map(entry => {
+
+        const similarity = this.cosineSimilarity(queryVector, entry.vector);
+
+        
+
+        // --- TEMPORAL DECAY VS ANCHOR FORMULA ---
+
+        const createdAt = new Date(entry.metadata.createdAt || Date.now());
+
+        const ageInDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+
+        
+
+        const isAnchor = entry.metadata.isAnchor === true || entry.metadata.tier === 'meta-summary';
+
+        const decay = isAnchor ? 1.0 : Math.exp(-DECAY_LAMBDA * ageInDays);
+
+        const boost = isAnchor ? 0.3 : 0;
+
+        
+
+        const score = (similarity * decay) + boost;
+
+
+
+        return { ...entry, score };
+
+      })
+
+      .sort((a, b) => b.score - a.score)
+
+      .slice(0, limit);
+
+
+
+      return results;
+
+    } catch (error) {
+
+      logger.error('Vector search failed', error);
+
+      return [];
+
+    }
+
+  }
+
+  async findRelated(id: string, limit: number = 3) {
+    const target = this.memory.find(m => m.id === id);
+    if (!target) return [];
+
+    return this.memory
+      .filter(m => m.id !== id)
+      .map(entry => ({
+        ...entry,
+        score: this.cosineSimilarity(target.vector, entry.vector)
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  getRecentEntries(limit: number = 50) {
+    return this.memory.slice(-limit);
+  }
+
+  getEntriesByIds(ids: string[]) {
+    return this.memory.filter(m => ids.includes(m.id));
+  }
+
+  getMemoryInternal() {
+    return this.memory;
+  }
+
+  private cosineSimilarity(vecA: number[], vecB: number[]): number {
+    let dotProduct = 0;
+    let magA = 0;
+    let magB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      magA += vecA[i] * vecA[i];
+      magB += vecB[i] * vecB[i];
+    }
+    return dotProduct / (Math.sqrt(magA) * Math.sqrt(magB));
+  }
+}
+
+export const vectorService = new VectorService();
