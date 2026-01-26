@@ -2,13 +2,50 @@
   "name": "solvent-ai-v1-production",
   "version": "1.0.0",
   "description": "Solvent AI Desktop Suite",
-  "main": "electron/main.ts",
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.solvent.ai",
+    "productName": "Solvent AI",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/main.js",
+      "electron/preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "dist/**/*",
+          "package.json",
+          "node_modules/**/*"
+        ]
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist"
+      }
+    ],
+    "linux": {
+      "target": "AppImage",
+      "category": "Development"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  },
   "scripts": {
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
-    "build:electron": "esbuild electron/preload.ts --outfile=electron/preload.js --bundle --platform=node --external:electron && esbuild electron/main.ts --outfile=electron/main.js --bundle --platform=node --external:electron",
+    "build:electron": "esbuild electron/preload.ts --outfile=electron/preload.js --bundle --platform=node --external:electron && esbuild electron/main.ts --outfile=electron/main.js --bundle --platform=node --external:electron --external:systeminformation",
     "desktop": "npm run build:electron && electron electron/main.js",
-    "build:frontend": "cd frontend && npm run build"
+    "build:frontend": "cd frontend && npm run build",
+    "test:e2e": "npm run build:electron && playwright test"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +57,7 @@
     "tsx": "^4.21.0"
   },
   "dependencies": {
-    "electron-store": "^11.0.2"
+    "electron-store": "^11.0.2",
+    "systeminformation": "^5.30.5"
   }
 }

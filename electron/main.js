@@ -14979,6 +14979,7 @@ var require_semver2 = __commonJS({
 var import_electron3 = require("electron");
 var import_path = __toESM(require("path"));
 var import_fs = __toESM(require("fs"));
+var import_child_process = require("child_process");
 
 // node_modules/electron-store/index.js
 var import_node_process7 = __toESM(require("node:process"), 1);
@@ -16547,9 +16548,12 @@ var API = {
       smartRouter: false
       // We are doing the routing here
     };
-    const response = await fetch("http://localhost:3001/chat", {
+    const response = await fetch("http://localhost:3001/api/v1/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-solvent-secret": "solvent_internal_dev_secret"
+      },
       body: JSON.stringify(payload)
     });
     if (!response.ok) {
@@ -16620,46 +16624,61 @@ var ModelManager = {
 };
 
 // electron/main.ts
+var import_systeminformation = __toESM(require("systeminformation"));
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
-import_electron3.app.disableHardwareAcceleration();
-import_electron3.app.commandLine.appendSwitch("disable-gpu");
-import_electron3.app.commandLine.appendSwitch("disable-gpu-compositing");
+var SESSION_SECRET = process.env.BACKEND_INTERNAL_SECRET || "solvent_default_secure_pass_2026";
+process.env.BACKEND_INTERNAL_SECRET = SESSION_SECRET;
 async function createWindow() {
   await import_electron3.session.defaultSession.clearCache();
   const mainWindow = new import_electron3.BrowserWindow({
     width: 1300,
     height: 900,
     frame: false,
-    // Custom frame for all platforms
     titleBarStyle: "hidden",
-    // Standard hidden for custom controls
     backgroundColor: "#050508",
-    // Matches your theme
-    show: false,
-    // Prevents white flash
+    show: true,
     webPreferences: {
       preload: import_path.default.join(__dirname, "preload.js"),
-      // CRITICAL: This allows the PiP window to share the same JS context
-      // @ts-ignore
-      nativeWindowOpen: true,
       devTools: true,
       contextIsolation: true,
       nodeIntegration: false
+      // nativeWindowOpen is deprecated, removed.
     }
   });
-  import_electron3.ipcMain.on("window-minimize", () => mainWindow.minimize());
-  import_electron3.ipcMain.on("window-maximize", () => {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
+  mainWindow.webContents.on("context-menu", (event, params) => {
+    const menu = new import_electron3.Menu();
+    menu.append(new import_electron3.MenuItem({ label: "Cut", role: "cut", enabled: params.editFlags.canCut }));
+    menu.append(new import_electron3.MenuItem({ label: "Copy", role: "copy", enabled: params.editFlags.canCopy }));
+    menu.append(new import_electron3.MenuItem({ label: "Paste", role: "paste", enabled: params.editFlags.canPaste }));
+    menu.append(new import_electron3.MenuItem({ type: "separator" }));
+    menu.append(new import_electron3.MenuItem({ label: "Select All", role: "selectAll" }));
+    menu.append(new import_electron3.MenuItem({ type: "separator" }));
+    menu.append(new import_electron3.MenuItem({ label: "Inspect Element", click: () => mainWindow.webContents.inspectElement(params.x, params.y) }));
+    menu.popup();
+  });
+  import_electron3.ipcMain.on("window-minimize", (event) => {
+    const win = import_electron3.BrowserWindow.fromWebContents(event.sender);
+    win?.minimize();
+  });
+  import_electron3.ipcMain.on("window-maximize", (event) => {
+    const win = import_electron3.BrowserWindow.fromWebContents(event.sender);
+    if (win?.isMaximized()) {
+      win.unmaximize();
     } else {
-      mainWindow.maximize();
+      win?.maximize();
     }
   });
-  import_electron3.ipcMain.on("window-close", () => mainWindow.close());
+  import_electron3.ipcMain.on("window-close", (event) => {
+    const win = import_electron3.BrowserWindow.fromWebContents(event.sender);
+    win?.close();
+  });
+  import_electron3.ipcMain.handle("get-session-secret", () => SESSION_SECRET);
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("https:")) {
-      import_electron3.shell.openExternal(url);
-      return { action: "deny" };
+    if (url.startsWith("https:") || url.startsWith("http:")) {
+      if (!url.includes("localhost:5173")) {
+        import_electron3.shell.openExternal(url);
+        return { action: "deny" };
+      }
     }
     return {
       action: "allow",
@@ -16668,6 +16687,7 @@ async function createWindow() {
         frame: false,
         backgroundColor: "#020617",
         webPreferences: {
+          preload: import_path.default.join(__dirname, "preload.js"),
           nodeIntegration: false,
           contextIsolation: true
         }
@@ -16709,6 +16729,11 @@ async function createWindow() {
       status: "active"
     };
   });
+  import_electron3.ipcMain.on("set-app-mode", (event, mode) => {
+    import_electron3.BrowserWindow.getAllWindows().forEach((win) => {
+      win.webContents.send("app-mode-changed", mode);
+    });
+  });
   import_electron3.ipcMain.handle("model:execute", async (_, tier, messages) => {
     return await ModelManager.execute(tier, messages);
   });
@@ -16726,14 +16751,40 @@ async function createWindow() {
     console.error("Failed to load notes:", e);
   }
   import_electron3.ipcMain.on("sync-notepad-to-disk", (event, content) => {
+    if (content === notepadBuffer) return;
     notepadBuffer = content;
     try {
       import_fs.default.writeFileSync(NOTES_FILE, content);
+      import_electron3.BrowserWindow.getAllWindows().forEach((win) => {
+        if (win.webContents !== event.sender) {
+          win.webContents.send("ai-updated-notepad", content);
+        }
+      });
     } catch (e) {
       console.error("Failed to save notes:", e);
     }
   });
   import_electron3.ipcMain.handle("get-notepad", () => notepadBuffer);
+  setInterval(async () => {
+    try {
+      const cpu = await import_systeminformation.default.currentLoad();
+      const mem = await import_systeminformation.default.mem();
+      const network = await import_systeminformation.default.networkStats();
+      const disk = await import_systeminformation.default.fsStats();
+      const stats = {
+        cpu: Math.round(cpu.currentLoad),
+        mem: Math.round(mem.active / mem.total * 100),
+        net: network[0] ? Math.round(network[0].rx_sec / 1024) : 0,
+        // KB/s
+        disk: disk.wx_sec ? Math.round(disk.wx_sec / 1024) : 0
+        // KB/s
+      };
+      import_electron3.BrowserWindow.getAllWindows().forEach((win) => {
+        win.webContents.send("system-telemetry", stats);
+      });
+    } catch (e) {
+    }
+  }, 2e3);
   let fsWait = false;
   import_fs.default.watch(NOTES_FILE, (eventType, filename) => {
     if (filename && eventType === "change") {
@@ -16762,7 +16813,21 @@ async function createWindow() {
       setTimeout(() => loadWithRetry(window, url), 1e3);
     });
   };
-  loadWithRetry(mainWindow, "http://localhost:5173");
+  if (import_electron3.app.isPackaged) {
+    const backendPath = import_path.default.join(process.resourcesPath, "backend", "dist", "server.js");
+    const frontendPath = import_path.default.join(process.resourcesPath, "frontend", "dist", "index.html");
+    console.log("[Electron] Starting Backend from:", backendPath);
+    const backendProcess = (0, import_child_process.spawn)("node", [backendPath], {
+      env: { ...process.env, BACKEND_INTERNAL_SECRET: SESSION_SECRET, PORT: "3001" },
+      stdio: "inherit"
+    });
+    import_electron3.app.on("will-quit", () => {
+      backendProcess.kill();
+    });
+    mainWindow.loadFile(frontendPath).catch((e) => console.error("Failed to load frontend:", e));
+  } else {
+    loadWithRetry(mainWindow, "http://localhost:5173");
+  }
   mainWindow.once("ready-to-show", () => {
     mainWindow.maximize();
     mainWindow.show();

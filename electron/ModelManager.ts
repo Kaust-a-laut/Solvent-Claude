@@ -34,9 +34,12 @@ const API = {
     };
 
     // Use built-in fetch (Node 18+)
-    const response = await fetch('http://localhost:3001/chat', {
+    const response = await fetch('http://localhost:3001/api/v1/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-solvent-secret': 'solvent_internal_dev_secret' 
+      },
       body: JSON.stringify(payload)
     });
 

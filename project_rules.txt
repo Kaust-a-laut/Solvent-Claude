@@ -1,0 +1,1 @@
+Solvent AI uses Logic Waterfall process for code refactoring.

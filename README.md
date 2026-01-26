@@ -9,6 +9,8 @@ Solvent AI is a **smart, hierarchical AI assistant** designed to seamlessly swit
 - **Graph Extraction:** Visualizes relationships in your data by extracting knowledge graphs from AI responses.
 - **Browser Mode:** Injects real-time search results (via Serper) into the context for up-to-date answers.
 - **Vision Support:** Multimodal capabilities using Gemini Vision.
+- **Async Task Infrastructure:** Redis-backed queue system for handling high-latency operations like project indexing and memory maintenance.
+- **Plugin Architecture:** Dynamic plugin system for extending AI providers and tools without modifying core code.
 
 ## 🏗 Architecture
 

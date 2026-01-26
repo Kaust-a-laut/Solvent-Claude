@@ -1,22 +1,12 @@
-import fs from 'fs/promises';
-import path from 'path';
 import crypto from 'crypto';
+import { IStorageProvider, FileStorageProvider } from './storageProvider';
 
 export class StorageService {
-  private baseDir: string;
-  private cacheDir: string;
-  private tracesDir: string;
+  private provider: IStorageProvider;
 
-  constructor() {
-    this.baseDir = path.join(process.cwd(), '.solvent');
-    this.cacheDir = path.join(this.baseDir, 'cache');
-    this.tracesDir = path.join(this.baseDir, 'traces');
-    this.init();
-  }
-
-  private async init() {
-    await fs.mkdir(this.cacheDir, { recursive: true });
-    await fs.mkdir(this.tracesDir, { recursive: true });
+  constructor(provider?: IStorageProvider) {
+    // Default to FileStorageProvider, but can be injected with RedisProvider, etc.
+    this.provider = provider || new FileStorageProvider();
   }
 
   private getHash(content: string): string {
@@ -24,32 +14,17 @@ export class StorageService {
   }
 
   async getCachedWaterfall(prompt: string, context: string = ''): Promise<any | null> {
-    const hash = this.getHash(prompt + context);
-    const cachePath = path.join(this.cacheDir, `${hash}.json`);
-    try {
-      const data = await fs.readFile(cachePath, 'utf-8');
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
+    const key = this.getHash(prompt + context);
+    return this.provider.get(key);
   }
 
   async cacheWaterfall(prompt: string, context: string, data: any) {
-    const hash = this.getHash(prompt + context);
-    const cachePath = path.join(this.cacheDir, `${hash}.json`);
-    await fs.writeFile(cachePath, JSON.stringify(data, null, 2));
+    const key = this.getHash(prompt + context);
+    await this.provider.set(key, data);
   }
 
   async saveTrace(data: any) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const traceId = `trace-${timestamp}-${crypto.randomBytes(4).toString('hex')}`;
-    const tracePath = path.join(this.tracesDir, `${traceId}.json`);
-    await fs.writeFile(tracePath, JSON.stringify({
-        id: traceId,
-        timestamp: new Date().toISOString(),
-        ...data
-    }, null, 2));
-    return traceId;
+    return this.provider.saveTrace(data);
   }
 }
 

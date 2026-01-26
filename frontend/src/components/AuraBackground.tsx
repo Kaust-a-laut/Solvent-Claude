@@ -1,26 +1,49 @@
-import React, { memo } from 'react';
+import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../store/useAppStore';
 
-const AuraBackground: React.FC<{ children: React.ReactNode }> = memo(({ children }) => {
+const AuraBackground: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { auraMode } = useAppStore();
+  console.log('[DEBUG] AuraBackground Rendering, Mode:', auraMode);
 
   return (
-    <div className="relative min-h-screen w-full bg-[#030305] overflow-hidden text-jb-text">
+    <div className="relative min-h-screen w-full bg-[#020205] overflow-hidden text-jb-text">
       <style>{`
-        @keyframes breathe-massive {
-          0%, 100% { opacity: 0.7; transform: scale(1) translateZ(0); }
-          50% { opacity: 0.9; transform: scale(1.1) translateZ(0); }
+        @keyframes aura-organic-pulse {
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.1); }
         }
-        @keyframes breathe-subtle {
-          0%, 100% { opacity: 0.5; transform: scale(1.05) translateZ(0); }
-          50% { opacity: 0.8; transform: scale(1) translateZ(0); }
+        .aura-mesh-container {
+          position: absolute;
+          inset: -50%;
+          width: 200%;
+          height: 200%;
+          background-image: 
+            radial-gradient(circle at 35% 50%, rgba(60, 113, 247, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 65% 50%, rgba(157, 91, 210, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(251, 146, 60, 0.1) 0%, transparent 50%);
+          background-blend-mode: screen;
+          filter: blur(100px);
+          animation: aura-organic-pulse 25s infinite ease-in-out;
+          will-change: opacity, transform;
+          transform: translate3d(0,0,0);
+          pointer-events: none;
         }
-        .animate-breathe-massive { animation: breathe-massive 18s infinite ease-in-out; }
-        .animate-breathe-subtle { animation: breathe-subtle 22s infinite ease-in-out; }
+        .noise-overlay {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          opacity: 0.03;
+          pointer-events: none;
+          z-index: 1;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
       `}</style>
       
-      {/* ORGANIC AURA: Ultra High Vibrancy Adaptive Synthesis (V4+ Style) */}
+      <div className="noise-overlay" />
+      
+      {/* ORGANIC AURA: Optimized Mesh Synthesis */}
       <AnimatePresence>
         {auraMode === 'organic' && (
           <motion.div 
@@ -29,45 +52,21 @@ const AuraBackground: React.FC<{ children: React.ReactNode }> = memo(({ children
             exit={{ opacity: 0 }}
             className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none"
           >
-            {/* Massive Primary Wash: Ultra Magenta/Pink (Left to Center) */}
-            <div
-              className="animate-breathe-massive absolute top-[-15%] left-[-25%] w-[130%] h-[130%] rounded-full mix-blend-screen blur-[120px] will-change-transform"
-              style={{
-                background: 'radial-gradient(circle at 35% 50%, rgba(157, 91, 210, 0.7) 0%, rgba(244, 63, 94, 0.55) 30%, transparent 70%)',
-              }}
+            <div className="aura-mesh-container" />
+            <motion.div 
+               animate={{ 
+                 x: [0, 100, 0],
+                 y: [0, -50, 0],
+                 opacity: [0.1, 0.2, 0.1]
+               }}
+               transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+               className="absolute top-1/3 left-1/3 w-[50%] h-[50%] rounded-full bg-jb-accent/5 blur-[120px] will-change-transform"
             />
-
-            {/* Massive Secondary Wash: Electric Neon Blue (Right side) */}
-            <div
-              className="animate-breathe-subtle absolute top-[-10%] right-[-25%] w-[130%] h-[130%] rounded-full mix-blend-screen blur-[130px] will-change-transform"
-              style={{
-                background: 'radial-gradient(circle at 65% 50%, rgba(60, 113, 247, 0.7) 0%, rgba(6, 182, 212, 0.45) 40%, transparent 70%)',
-              }}
-            />
-
-            {/* High-Intensity Core: Vibrant Orange Pop */}
-            <div
-              className="animate-breathe-massive absolute top-[10%] left-[10%] w-[100%] h-[100%] rounded-full mix-blend-screen blur-[140px] will-change-transform"
-              style={{
-                background: 'radial-gradient(circle at 40% 40%, rgba(251, 146, 60, 0.45) 0%, rgba(244, 63, 94, 0.25) 50%, transparent 70%)',
-              }}
-            />
-
-            {/* Bottom-Center Warming: Deep Purple/Blue Base */}
-            <div
-              className="animate-breathe-subtle absolute bottom-[-20%] left-1/2 -translate-x-1/2 w-[100%] h-[80%] rounded-full mix-blend-screen blur-[120px] will-change-transform"
-              style={{
-                background: 'radial-gradient(circle at center, rgba(157, 91, 210, 0.4) 0%, rgba(60, 113, 247, 0.3) 60%, transparent 80%)',
-              }}
-            />
-
-            {/* Global Noise Texture - Increased for V4 feel */}
-            <div className="absolute inset-0 opacity-[0.08] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* STATIC AURA: Predictable, fixed resource allocation (Balanced High Vibrancy) */}
+      {/* STATIC AURA: Deep Space Glow */}
       <AnimatePresence>
         {auraMode === 'static' && (
           <motion.div 
@@ -77,24 +76,20 @@ const AuraBackground: React.FC<{ children: React.ReactNode }> = memo(({ children
             className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none"
           >
             <div 
-              className="absolute top-[-5%] left-[-5%] w-[70%] h-[70%] rounded-full opacity-40 blur-[120px]"
+              className="absolute top-[-10%] left-[-10%] w-[80%] h-[80%] rounded-full opacity-20 blur-[150px]"
               style={{ background: 'radial-gradient(circle, #3C71F7 0%, transparent 70%)' }}
             />
             <div 
-              className="absolute bottom-[-5%] right-[-5%] w-[70%] h-[70%] rounded-full opacity-40 blur-[120px]"
+              className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[80%] rounded-full opacity-20 blur-[150px]"
               style={{ background: 'radial-gradient(circle, #9D5BD2 0%, transparent 70%)' }}
-            />
-            <div 
-              className="absolute top-[20%] right-[10%] w-[50%] h-[50%] rounded-full opacity-20 blur-[100px]"
-              style={{ background: 'radial-gradient(circle, #FB923C 0%, transparent 70%)' }}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* OFF MODE: Absolute minimum resource usage */}
+      {/* OFF MODE: Deep Void */}
       {auraMode === 'off' && (
-        <div className="absolute inset-0 bg-[#020204]" />
+        <div className="absolute inset-0 bg-[#020205]" />
       )}
 
       <div className="relative z-10 w-full h-[100dvh] flex flex-col">
@@ -102,6 +97,6 @@ const AuraBackground: React.FC<{ children: React.ReactNode }> = memo(({ children
       </div>
     </div>
   );
-});
+};
 
 export default AuraBackground;

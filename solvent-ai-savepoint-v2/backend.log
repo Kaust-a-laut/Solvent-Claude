@@ -1,5 +1,0 @@
-
-> solvent-ai-backend@1.0.0 dev
-> tsx watch src/server.ts
-
-Server is running on http://0.0.0.0:3001

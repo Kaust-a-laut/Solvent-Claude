@@ -1,37 +1,116 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter+Tight:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  .app-drag-region {
+    -webkit-app-region: drag;
+  }
+  .app-no-drag {
+    -webkit-app-region: no-drag;
+  }
+  
   body {
-    @apply bg-jb-dark text-jb-text font-sans antialiased overflow-hidden selection:bg-jb-accent/30 tracking-tight;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
+    @apply bg-[#020205] text-slate-200 antialiased font-sans;
+    overflow: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-header font-black tracking-tighter;
+  }
+
+  /* Cinematic Scrollbars - Wider for accessibility */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 99px;
+    transition: background 0.3s;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border: 3px solid transparent;
+    background-clip: padding-box;
   }
 }
 
 @layer components {
   .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .scrollbar-thin::-webkit-scrollbar { width: 3px; }
+  .scrollbar-thin::-webkit-scrollbar { width: 10px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors; }
-
-  .text-vibrant {
-    @apply bg-gradient-to-r from-jb-accent via-jb-purple to-jb-orange bg-clip-text text-transparent;
-    filter: drop-shadow(0 0 15px rgba(157, 91, 210, 0.3));
+  .scrollbar-thin::-webkit-scrollbar-thumb { 
+    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   .glass-panel {
-    @apply bg-black/40 backdrop-blur-md border border-white/5 shadow-2xl relative overflow-hidden;
+    @apply bg-black/20 backdrop-blur-3xl border border-white/[0.03] shadow-2xl relative overflow-hidden;
   }
 
   /* Add a rim-light effect to glass panels */
   .glass-panel::before {
     content: '';
-    @apply absolute inset-0 pointer-events-none border border-white/5 rounded-[inherit];
-    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.02) 100%);
+    @apply absolute inset-0 pointer-events-none border border-white/[0.05] rounded-[inherit];
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.01) 100%);
+  }
+
+  .glass-card {
+    @apply bg-white/[0.01] backdrop-blur-2xl border border-white/[0.03] rounded-2xl;
+  }
+
+  .text-vibrant {
+    @apply bg-gradient-to-r from-jb-accent via-jb-purple to-jb-orange bg-clip-text text-transparent inline-block;
+    filter: drop-shadow(0 0 15px rgba(60, 113, 247, 0.3));
+    padding-right: 0.1em;
+    padding-left: 0.02em;
+    padding-bottom: 0.15em;
+    margin-right: -0.1em;
+    margin-bottom: -0.15em;
+  }
+
+  /* Scan-Line Skeleton Effect */
+  .skeleton-scan {
+    @apply relative overflow-hidden bg-white/5;
+  }
+  .skeleton-scan::after {
+    content: "";
+    @apply absolute inset-0 -translate-y-full;
+    background: linear-gradient(to bottom, transparent, rgba(60, 113, 247, 0.1), transparent);
+    animation: scan 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes scan {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+
+  .button-glow-hover {
+    @apply transition-all duration-300;
+  }
+  .button-glow-hover:hover {
+    @apply shadow-[0_0_20px_rgba(60,113,247,0.25)] border-jb-accent/50;
+  }
+
+  /* Chat bubble refinements - more translucent and glass-like */
+  .chat-bubble-user {
+    @apply bg-jb-accent/10 backdrop-blur-xl text-white shadow-2xl shadow-jb-accent/5 border border-jb-accent/20;
+  }
+
+  .chat-bubble-ai {
+    @apply bg-white/[0.02] backdrop-blur-md border border-white/[0.05] text-[15.5px] leading-[1.6];
+  }
+
+  /* Technical Metadata */
+  .technical-meta {
+    @apply font-mono text-[10px] uppercase tracking-widest text-white/30;
   }
 
   @keyframes border-flow {
@@ -56,19 +135,16 @@
     filter: blur(1px);
   }
 
-  /* Chat bubble refinements - more translucent and glass-like */
-  .chat-bubble-user {
-    @apply bg-gradient-to-br from-jb-accent/90 via-jb-purple/90 to-jb-pink/90 backdrop-blur-xl text-white shadow-2xl shadow-jb-accent/20 border border-white/20;
+  .liquid-input {
+    @apply bg-black/40 backdrop-blur-3xl;
   }
 
-  .chat-bubble-ai {
-    @apply bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_20px_50_rgba(0,0,0,0.3)] text-[15.5px] leading-relaxed;
+  .hud-corner {
+    @apply absolute w-4 h-4 border-white/20 pointer-events-none z-50;
   }
 
-  .chat-bubble-ai::before {
-    content: '';
-    @apply absolute inset-0 pointer-events-none rounded-[inherit];
-    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%);
+  .hud-line {
+    @apply absolute bg-white/10 pointer-events-none z-50;
   }
 
   /* Laboratory Report Fidelity: Code Blocks */
@@ -115,27 +191,4 @@
   .prose tr:hover td {
     @apply bg-white/[0.02] text-white;
   }
-
-  /* Liquid Intelligence Animations - Optimized to Static */
-  .liquid-input {
-    @apply bg-[#08080a]/90 backdrop-blur-md;
-  }
-
-  .neural-scan::after {
-    display: none;
-  }
-
-  .hud-corner {
-    @apply absolute w-4 h-4 border-slate-500/30 pointer-events-none z-50 opacity-40;
-  }
-
-  .hud-line {
-    @apply absolute bg-slate-500/20 pointer-events-none z-50;
-  }
-}
-
-/* Linux Compatibility: Disable backdrop filters when GPU is off to prevent black screens */
-* {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }

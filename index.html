@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Medication Tracker</title>
+</head>
+<body>
+    <h1>Morning Medications</h1>
+    <ul id="medication-list">
+        <li><input type="checkbox" id="med1"> <label for="med1">Medication 1</label></li>
+        <li><input type="checkbox" id="med2"> <label for="med2">Medication 2</label></li>
+        <li><input type="checkbox" id="med3"> <label for="med3">Medication 3</label></li>
+        <li><input type="checkbox" id="med4"> <label for="med4">Medication 4</label></li>
+        <li><input type="checkbox" id="med5"> <label for="med5">Medication 5</label></li>
+        <li><input type="checkbox" id="med6"> <label for="med6">Medication 6</label></li>
+        <li><input type="checkbox" id="med7"> <label for="med7">Medication 7</label></li>
+        <li><input type="checkbox" id="med8"> <label for="med8">Medication 8</label></li>
+        <li><input type="checkbox" id="med9"> <label for="med9">Medication 9</label></li>
+        <li><input type="checkbox" id="med10"> <label for="med10">Medication 10</label></li>
+    </ul>
+
+    <script>
+        // Basic JavaScript for tracking (can be expanded later)
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    console.log(`${event.target.id} taken.`);
+                } else {
+                    console.log(`${event.target.id} untaken.`);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -9,11 +9,15 @@ import_electron.contextBridge.exposeInMainWorld("electron", {
   saveNotepad: (content) => import_electron.ipcRenderer.send("sync-notepad-to-disk", content),
   getNotepad: () => import_electron.ipcRenderer.invoke("get-notepad"),
   onNotepadUpdated: (callback) => {
-    const subscription = (_event, content) => callback(content);
-    import_electron.ipcRenderer.on("ai-updated-notepad", subscription);
-    return () => import_electron.ipcRenderer.removeListener("ai-updated-notepad", subscription);
+    const listener = (_event, content) => callback(content);
+    import_electron.ipcRenderer.on("ai-updated-notepad", listener);
+    return () => import_electron.ipcRenderer.removeListener("ai-updated-notepad", listener);
   },
-  // Supervisor Agent
+  onSystemTelemetry: (callback) => {
+    const listener = (_event, stats) => callback(stats);
+    import_electron.ipcRenderer.on("system-telemetry", listener);
+    return () => import_electron.ipcRenderer.removeListener("system-telemetry", listener);
+  },
   reportActivity: (activity) => import_electron.ipcRenderer.send("report-activity", activity),
   logAction: (action) => import_electron.ipcRenderer.send("report-activity", action),
   setMissionGoal: (goal) => import_electron.ipcRenderer.send("set-mission-goal", goal),
@@ -28,6 +32,19 @@ import_electron.contextBridge.exposeInMainWorld("electron", {
     import_electron.ipcRenderer.on("supervisor-new-data", subscription);
     return () => import_electron.ipcRenderer.removeListener("supervisor-new-data", subscription);
   },
+  onSupervisorClarification: (callback) => {
+    const subscription = (_event, req) => callback(req);
+    import_electron.ipcRenderer.on("supervisor-clarification", subscription);
+    return () => import_electron.ipcRenderer.removeListener("supervisor-clarification", subscription);
+  },
+  // Window Management & Sync
+  setMode: (mode) => import_electron.ipcRenderer.send("set-app-mode", mode),
+  onModeChanged: (callback) => {
+    const listener = (_event, mode) => callback(mode);
+    import_electron.ipcRenderer.on("app-mode-changed", listener);
+    return () => import_electron.ipcRenderer.removeListener("app-mode-changed", listener);
+  },
+  getSessionSecret: () => import_electron.ipcRenderer.invoke("get-session-secret"),
   // Model Manager
   model: {
     execute: (tier, messages) => import_electron.ipcRenderer.invoke("model:execute", tier, messages),

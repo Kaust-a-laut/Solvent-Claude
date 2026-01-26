@@ -15,16 +15,36 @@ export class APIError extends Error {
   }
 }
 
+let cachedSecret: string | null = null;
+
+async function getSecret() {
+  if (cachedSecret) return cachedSecret;
+  if (window.electron?.getSessionSecret) {
+    cachedSecret = await window.electron.getSessionSecret();
+    return cachedSecret;
+  }
+  return 'solvent_default_secure_pass_2026'; // Fallback for pure web dev mode
+}
+
 export async function fetchWithRetry(url: string, options: RequestOptions = {}): Promise<any> {
   const { retries = 3, backoff = 1000, ...fetchOptions } = options;
+  const secret = await getSecret();
   
   let lastError: Error | null = null;
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      console.log(`[API] Fetching ${url} (Attempt ${attempt + 1}/${retries})`);
-      
-      const response = await fetch(url, fetchOptions);
+      const headers: any = {
+        ...options.headers,
+        'X-Solvent-Secret': secret
+      };
+
+      // If body is FormData, don't set Content-Type header to allow browser to set boundary
+      if (options.body instanceof FormData) {
+        delete headers['Content-Type'];
+      }
+
+      const response = await fetch(url, { ...fetchOptions, headers });
       
       if (!response.ok) {
         let errorBody;

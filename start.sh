@@ -11,6 +11,10 @@ trap cleanup EXIT
 
 echo "🚀 Initializing Solvent AI Desktop Suite..."
 
+# Generate Dynamic Session Secret for Security
+export BACKEND_INTERNAL_SECRET=$(openssl rand -hex 32)
+echo "🔒 Session Secret Generated"
+
 # 1. Start Backend
 echo "Starting Backend..."
 npm run dev:backend > backend.log 2>&1 &

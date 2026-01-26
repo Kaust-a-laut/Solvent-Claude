@@ -8,21 +8,24 @@ export default {
     extend: {
       colors: {
         jb: {
-          dark: '#020205',      // Deepest black for contrast
-          panel: '#0A0B10',     
+          dark: '#020205',      // Deep Void
+          panel: '#050508',     // Glass Layer
           hover: '#12141C',     
-          border: '#1E202A',    
+          border: 'rgba(255, 255, 255, 0.03)', // Almost invisible
           text: '#C0C2C8',      
-          accent: '#3C71F7',    // Electric Blue
-          purple: '#9D5BD2',    // Deep Purple
-          pink: '#F43F5E',      // Vibrant Rose/Pink
-          orange: '#FB923C',    // Soft Neon Orange
+          accent: '#3C71F7',    // Electric Volt (Logic)
+          purple: '#9D5BD2',    // Neural Purple (Agentic)
+          orange: '#FB923C',    // Neon Amber (Action)
           cyan: '#06B6D4',      
         }
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'monospace'],
-        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        sans: ['Inter Tight', 'Inter', 'Plus Jakarta Sans', 'sans-serif'],
+        header: ['Geist Sans', 'Inter Tight', 'sans-serif'],
+      },
+      backdropBlur: {
+        '3xl': '40px',
       },
       animation: {
         'blob': 'blob 25s infinite',

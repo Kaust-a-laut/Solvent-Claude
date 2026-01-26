@@ -6,6 +6,8 @@ import { logger } from '../utils/logger';
 import { CrystallizedMemory, CrystallizedRule, SuccessPattern, SupervisoryInsight } from '../types/memory';
 import { AtomicFileSystem } from '../utils/fileSystem';
 import { BackupManager } from '../utils/backupManager';
+import { HNSWIndex } from '../utils/hnswIndex';
+import { memoryMetrics } from '../utils/memoryMetrics';
 
 interface VectorEntry {
   id: string;
@@ -28,6 +30,9 @@ export class VectorService {
   private cacheWriteCounter: number = 0;
   private readonly CACHE_PERSIST_THRESHOLD = 100;
   private backupManager: BackupManager;
+  private hnswIndex: HNSWIndex | null = null;
+  private hnswIndexPath: string;
+  private useHNSW: boolean = true;
   private saveCounter: number = 0;
   private readonly BACKUP_INTERVAL = 50;
 
@@ -46,8 +51,44 @@ export class VectorService {
       path.resolve(__dirname, '../../../.solvent_backups'),
       5
     );
+    this.hnswIndexPath = path.resolve(__dirname, '../../../.solvent_hnsw.bin');
     this.loadMemory();
     this.embeddingCacheLoaded = this.loadEmbeddingCache();
+    this.initHNSWIndex();
+  }
+
+  private async initHNSWIndex() {
+    try {
+      this.hnswIndex = new HNSWIndex(768, config.MEMORY_MAX_ENTRIES + 500);
+
+      // Try to load existing index
+      try {
+        await this.hnswIndex.load(this.hnswIndexPath);
+        logger.info('[VectorService] Loaded existing HNSW index.');
+      } catch {
+        // No existing index, rebuild from memory once it's loaded
+        // We wait for memory to be loaded in loadMemory()
+      }
+    } catch (e) {
+      logger.warn('[VectorService] HNSW initialization failed, using brute force.', e);
+      this.useHNSW = false;
+    }
+  }
+
+  private async rebuildHNSWIndex() {
+    if (!this.hnswIndex) return;
+
+    logger.info('[VectorService] Rebuilding HNSW index from memory...');
+    for (const entry of this.memory) {
+      this.hnswIndex.add(entry.id, entry.vector);
+    }
+
+    try {
+      await this.hnswIndex.save(this.hnswIndexPath);
+      logger.info(`[VectorService] HNSW index rebuilt with ${this.memory.length} entries.`);
+    } catch (e) {
+      logger.error('[VectorService] Failed to save rebuilt HNSW index', e);
+    }
   }
 
   private getGenAI(): GoogleGenerativeAI {
@@ -63,6 +104,11 @@ export class VectorService {
       this.memory = JSON.parse(data);
       this.rebuildIndices();
       logger.info(`Loaded ${this.memory.length} vectors from memory and rebuilt indices.`);
+      
+      // If HNSW index is empty but we have memory, rebuild it
+      if (this.useHNSW && this.hnswIndex && this.hnswIndex.size() === 0 && this.memory.length > 0) {
+        this.rebuildHNSWIndex();
+      }
     } catch (e: any) {
       logger.error(`[VectorService] Failed to load memory: ${e.message}`);
 
@@ -84,6 +130,7 @@ export class VectorService {
         this.memory = JSON.parse(data);
         this.rebuildIndices();
         logger.info(`[VectorService] Recovery successful. Loaded ${this.memory.length} vectors.`);
+        if (this.useHNSW) this.rebuildHNSWIndex();
         return true;
       } catch (e) {
         logger.error('[VectorService] Failed to load restored data');
@@ -172,6 +219,10 @@ export class VectorService {
     const entry = this.memory.find(m => m.id === id);
     if (!entry) return;
 
+    if (this.hnswIndex && this.useHNSW) {
+      this.hnswIndex.markDeleted(id);
+    }
+
     if (entry.metadata.type) {
       this.typeIndex.get(entry.metadata.type)?.delete(id);
     }
@@ -211,6 +262,7 @@ export class VectorService {
       }
 
       await AtomicFileSystem.writeJson(this.dbPath, this.memory);
+      this.updateMetrics();
 
       // Periodic backup
       this.saveCounter++;
@@ -218,6 +270,13 @@ export class VectorService {
         this.saveCounter = 0;
         this.backupManager.createBackup().catch(e =>
           logger.error('[VectorService] Backup creation failed', e)
+        );
+      }
+
+      // Persist HNSW index periodically
+      if (this.hnswIndex && this.useHNSW && this.saveCounter % 10 === 0) {
+        this.hnswIndex.save(this.hnswIndexPath).catch(e =>
+          logger.error('[VectorService] HNSW save failed', e)
         );
       }
     } catch (error) {
@@ -272,6 +331,7 @@ export class VectorService {
     const cached = this.embeddingCache.get(text);
     if (cached) {
       cached.lastAccess = Date.now();
+      memoryMetrics.recordCacheHit();
       return cached.vector;
     }
 
@@ -281,6 +341,7 @@ export class VectorService {
       const result = await model.embedContent(text);
       const values = result.embedding.values;
       
+      memoryMetrics.recordCacheMiss();
       this.cacheEmbedding(text, values);
       
       return values;
@@ -355,6 +416,7 @@ export class VectorService {
       if (oldestKey) this.embeddingCache.delete(oldestKey);
     }
     this.embeddingCache.set(text, { vector, lastAccess: Date.now() });
+    memoryMetrics.updateCacheSize(this.embeddingCache.size);
 
     // Periodic persistence
     this.cacheWriteCounter++;
@@ -382,6 +444,9 @@ export class VectorService {
 
     this.memory.push(entry);
     this.addToIndices(entry);
+    if (this.hnswIndex && this.useHNSW) {
+      this.hnswIndex.add(entry.id, entry.vector);
+    }
     this.newEntriesSinceLastDream++;
 
     if (this.newEntriesSinceLastDream >= this.SATURATION_THRESHOLD) {
@@ -412,6 +477,9 @@ export class VectorService {
       };
       this.memory.push(entry);
       this.addToIndices(entry);
+      if (this.hnswIndex && this.useHNSW) {
+        this.hnswIndex.add(entry.id, entry.vector);
+      }
       ids.push(entry.id);
     });
 
@@ -647,14 +715,41 @@ export class VectorService {
       };
       
       logger.info(`[Gardening] Deprecated entry ${id}. Reason: ${reason}`);
-      await this.saveMemory();
-      return true;
-    }
-
-  async search(query: string, limit: number = 5, filter?: { type?: string, tier?: MemoryTier, tags?: string[], includeDeprecated?: boolean }) {
-    try {
-      const queryVector = await this.getEmbedding(query);
-      let candidates: VectorEntry[] = [];
+          await this.saveMemory();
+          return true;
+        }
+      
+        async searchFast(query: string, limit: number = 5): Promise<(VectorEntry & { score: number })[]> {
+          if (!this.hnswIndex || !this.useHNSW) {
+            return this.search(query, limit);
+          }
+      
+          const queryVector = await this.getEmbedding(query);
+          const results = this.hnswIndex.search(queryVector, limit * 2);
+      
+          // Map back to full entries and apply filters
+          const entries: (VectorEntry & { score: number })[] = [];
+          for (const { id, distance } of results) {
+            const entry = this.memory.find(m => m.id === id);
+            if (entry && entry.metadata.status !== 'deprecated') {
+              entries.push({ ...entry, score: 1 - distance }); // Convert distance to similarity
+            }
+          }
+      
+          return entries.slice(0, limit);
+        }
+      
+          async search(query: string, limit: number = 5, filter?: { type?: string, tier?: MemoryTier, tags?: string[], includeDeprecated?: boolean }) {
+      
+            const startTime = Date.now();
+      
+            try {
+      
+              const queryVector = await this.getEmbedding(query);
+      
+              let candidates: VectorEntry[] = [];
+      
+        
 
       // Use indices if filter is specific enough
       if (filter?.type && this.typeIndex.has(filter.type)) {
@@ -721,17 +816,25 @@ export class VectorService {
 
         return { ...entry, score };
 
-      })
+            })
 
-      .sort((a, b) => b.score - a.score)
+            .sort((a, b) => b.score - a.score)
 
-      .slice(0, limit);
+            .slice(0, limit);
 
+      
 
+            const latency = Date.now() - startTime;
 
-      return results;
+            memoryMetrics.recordRetrieval(latency, candidates.length, results.length);
 
-    } catch (error) {
+      
+
+            return results;
+
+          } catch (error) {
+
+      
 
       logger.error('Vector search failed', error);
 
@@ -765,6 +868,25 @@ export class VectorService {
 
   getMemoryInternal() {
     return this.memory;
+  }
+
+  private updateMetrics() {
+    const byTier: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+
+    for (const entry of this.memory) {
+      const tier = entry.metadata.tier || 'unknown';
+      const type = entry.metadata.type || 'unknown';
+      byTier[tier] = (byTier[tier] || 0) + 1;
+      byType[type] = (byType[type] || 0) + 1;
+    }
+
+    memoryMetrics.updateMemoryStats(
+      this.memory.length,
+      config.MEMORY_MAX_ENTRIES,
+      byTier,
+      byType
+    );
   }
 
   private cosineSimilarity(vecA: number[], vecB: number[]): number {

@@ -1,331 +1,459 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { StickyNote, Maximize2, ExternalLink, Save, X, Activity, Zap, Cpu, Terminal, Search, GripHorizontal } from 'lucide-react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { cn } from '../lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Brain, Save, X, Minimize2, Maximize2, ExternalLink, GripHorizontal, Network, Sparkles, Terminal, FileText } from 'lucide-react';
 import { Rnd } from 'react-rnd';
+import { cn } from '../lib/utils';
+import { KnowledgeMap } from './KnowledgeMap';
+
+import { socket } from '../lib/socket';
 
 export const FloatingNotepad = () => {
-  const { activities, addActivity, supervisorInsight, setNotepadContent } = useAppStore();
-  const [pipWindow, setPipWindow] = useState<any>(null);
-  const [note, setNote] = useState("");
-  const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'scratchpad' | 'supervisor'>('scratchpad');
-  const [position, setPosition] = useState(() => {
-    const saved = localStorage.getItem('solvent_notepad_pos');
-    return saved ? JSON.parse(saved) : { x: window.innerWidth - 360, y: 100 };
-  });
-  const [size, setSize] = useState(() => {
-     const saved = localStorage.getItem('solvent_notepad_size');
-     return saved ? JSON.parse(saved) : { width: 340, height: 500 };
-  });
 
-  const lastWriteRef = React.useRef(""); // The "Safety Mirror"
+  const { 
+
+    notepadContent, setNotepadContent, deviceInfo, isProcessing, 
+
+    showKnowledgeMap, setShowKnowledgeMap, graphNodes, graphEdges,
+
+    addGraphNode, addGraphEdge, removeGraphNode, setSupervisorInsight,
+
+    isCommandCenterOpen: isOpen, setIsCommandCenterOpen: setIsOpen
+
+  } = useAppStore();
+
+  const [isMinimized, setIsMinimized] = useState(false);
+
+    const [lastContent, setLastContent] = useState(notepadContent);
+
+    const [glow, setGlow] = useState(false);
+
   
-  // Load notes on mount and sync with Electron
-  useEffect(() => {
-    const savedOpenState = localStorage.getItem('solvent_notepad_visible');
-    if (savedOpenState === 'false') setIsOpen(false);
 
-    // Initial Fetch from Main Process (Disk)
-    if (window.electron?.getNotepad) {
-      window.electron.getNotepad().then((content) => {
-        if (content) {
-          setNote(content);
-          lastWriteRef.current = content; // Sync mirror on load
-        }
-      });
+    const [position, setPosition] = useState({
+      x: typeof window !== 'undefined' ? window.innerWidth - (showKnowledgeMap ? 640 : 420) : 100,
+      y: typeof window !== 'undefined' ? window.innerHeight - (showKnowledgeMap ? 620 : 520) : 100,
+    });
 
-      // 1. WATCH: Listen for AI updates from Electron
-      const cleanupNotes = window.electron.onNotepadUpdated((updatedContent) => {
-        if (updatedContent !== note && updatedContent !== lastWriteRef.current) {
-          setNote(updatedContent);
-          lastWriteRef.current = updatedContent;
-        }
-      });
+  
 
-      // 2. WATCH: Listen for Supervisor Data
-      const cleanupSupervisor = window.electron.onSupervisorData((data) => {
-        addActivity(data);
-      });
+    const [size, setSize] = useState({
 
-      return () => {
-        cleanupNotes();
-        cleanupSupervisor();
-      };
-    } else {
-      const savedNote = localStorage.getItem('solvent_notepad_content');
-      if (savedNote) setNote(savedNote);
-    }
-  }, []);
+      width: showKnowledgeMap ? 600 : 384,
 
-  // WRITE: Send user input to the AI's "Eyes"
-  useEffect(() => {
-    setNotepadContent(note);
-    if (window.electron?.saveNotepad) {
-      const debounceTimer = setTimeout(() => {
-        if (note !== lastWriteRef.current) {
-          lastWriteRef.current = note;
-          window.electron?.saveNotepad(note);
-        }
-      }, 700);
-      return () => clearTimeout(debounceTimer);
-    } else {
-      localStorage.setItem('solvent_notepad_content', note);
-    }
-  }, [note]);
+      height: showKnowledgeMap ? 550 : 450
 
-  // Save visibility
-  useEffect(() => {
-    localStorage.setItem('solvent_notepad_visible', String(isOpen));
-  }, [isOpen]);
+    });
 
-  const saveConfig = (newPos: any, newSize: any) => {
-     localStorage.setItem('solvent_notepad_pos', JSON.stringify(newPos));
-     localStorage.setItem('solvent_notepad_size', JSON.stringify(newSize));
-  };
+  
 
-  const togglePiP = async () => {
-    if (pipWindow) {
-      pipWindow.close();
-      setPipWindow(null);
-      return;
-    }
+    // Update position/size when map toggles or minimized
 
-    if (!('documentPictureInPicture' in window)) {
-        alert("Document Picture-in-Picture is not supported in your browser (use Chrome 116+).");
-        return;
-    }
+    useEffect(() => {
 
-    try {
-        // @ts-ignore
-        const nw = await window.documentPictureInPicture.requestWindow({
-            width: size.width,
-            height: size.height,
+      if (isMinimized) {
+
+        setSize(s => ({ ...s, height: 48 }));
+
+      } else {
+
+        setSize({
+
+          width: showKnowledgeMap ? 600 : 384,
+
+          height: showKnowledgeMap ? 550 : 450
+
         });
 
-        // Copy styles for cohesion
-        nw.document.body.style.backgroundColor = '#020617';
-        nw.document.body.style.margin = '0';
-        nw.document.body.style.fontFamily = 'JetBrains Mono, monospace'; // Enforce app font
-        nw.document.title = "Solvent Overseer";
+      }
 
-        setTimeout(() => {
-            [...document.styleSheets].forEach((styleSheet) => {
-                try {
-                    const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
-                    const style = document.createElement('style');
-                    style.textContent = cssRules;
-                    nw.document.head.appendChild(style);
-                } catch (e) { 
-                    const link = document.createElement('link');
-                    if (styleSheet.href) {
-                        link.rel = 'stylesheet';
-                        link.href = styleSheet.href;
-                        nw.document.head.appendChild(link);
-                    }
-                }
-            });
-        }, 100);
+    }, [showKnowledgeMap, isMinimized]);
 
-        nw.addEventListener("pagehide", () => setPipWindow(null));
-        setPipWindow(nw);
-    } catch (err: any) {
-        console.error("Failed to open PiP window", err);
-        alert(`PiP Error: ${err.message || err}`);
+  
+
+    // Auto-load initial content from disk via Electron
+
+  
+
+  useEffect(() => {
+
+    const loadNotes = async () => {
+      if (window.electron?.getNotepad) {
+        const content = await window.electron.getNotepad();
+        if (content !== undefined) {
+          setNotepadContent(content);
+          setLastContent(content);
+        }
+      }
+    };
+
+    loadNotes();
+
+
+
+    // Listen for external syncs
+
+    if (window.electron?.onNotepadUpdated) {
+
+      const cleanup = window.electron.onNotepadUpdated((content) => {
+
+        setNotepadContent(content);
+        setLastContent(content);
+        setGlow(true);
+        setTimeout(() => setGlow(false), 2000);
+
+      });
+
+      return cleanup;
+
+    }
+
+  }, [setNotepadContent]);
+
+  // Listen for Memory Crystallization (Backend Socket)
+  useEffect(() => {
+    const handleCrystallize = (data: any) => {
+      console.log("Memory Crystallized:", data);
+      setGlow(true);
+      setTimeout(() => setGlow(false), 3000);
+    };
+    
+    socket.on('MEMORY_CRYSTALLIZED', handleCrystallize);
+    return () => {
+      socket.off('MEMORY_CRYSTALLIZED', handleCrystallize);
+    };
+  }, []);
+
+  const handleSave = async () => {
+    if (window.electron?.saveNotepad) {
+       window.electron.saveNotepad(notepadContent);
+       setLastContent(notepadContent);
     }
   };
 
-  const ActivityIcon = ({ type }: { type: string }) => {
-    switch (type) {
-      case 'user_message': return <Activity size={12} className="text-blue-400" />;
-      case 'web_search': return <Search size={12} className="text-cyan-400" />;
-      case 'terminal': return <Terminal size={12} className="text-emerald-400" />;
-      case 'llm_response': return <Cpu size={12} className="text-purple-400" />;
-      default: return <Zap size={12} className="text-amber-400" />;
-    }
-  };
 
-  const NotepadContent = (
-    <div className="flex flex-col h-full bg-[#050508] text-slate-200 font-sans overflow-hidden border border-white/10">
-      {/* Tabs */}
-      <div className="flex bg-white/[0.02] border-b border-white/5 shrink-0 select-none">
-        <button 
-          onClick={() => setActiveTab('scratchpad')}
-          className={cn(
-            "flex-1 py-3 text-[9px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all hover:bg-white/5",
-            activeTab === 'scratchpad' ? "text-jb-accent border-b border-jb-accent bg-white/5" : "text-slate-500 hover:text-slate-300"
-          )}
-        >
-          <StickyNote size={12} /> Scratchpad
-        </button>
-        <button 
-          onClick={() => setActiveTab('supervisor')}
-          className={cn(
-            "flex-1 py-3 text-[9px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all hover:bg-white/5",
-            activeTab === 'supervisor' ? "text-jb-purple border-b border-jb-purple bg-white/5" : "text-slate-500 hover:text-slate-300"
-          )}
-        >
-          <Activity size={12} /> Supervisor
-        </button>
-      </div>
 
-      <div className="flex-1 overflow-hidden relative">
-        {activeTab === 'scratchpad' ? (
-          <div className="flex flex-col h-full">
-            <div className="p-2 px-4 flex items-center justify-between border-b border-white/5 bg-white/[0.01]">
-              <div className="text-[9px] text-slate-600 font-black uppercase tracking-widest flex items-center gap-1.5">
-                  <Save size={10} className="text-jb-accent" /> Auto-Sync Active
-              </div>
-              <span className="text-[8px] font-mono text-slate-700">.solvent_notes.md</span>
-            </div>
-            <textarea
-              className="flex-1 bg-transparent border-none outline-none resize-none text-[13px] font-mono leading-relaxed placeholder:text-slate-700 scrollbar-thin scrollbar-thumb-white/10 p-4 text-slate-300 selection:bg-jb-accent/30"
-              placeholder="// Type notes here..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              spellCheck={false}
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Thought Stream Header */}
-            <div className="p-4 bg-jb-purple/5 border-b border-jb-purple/10 shrink-0">
-               <div className="flex items-center gap-2 mb-2">
-                  <Cpu size={12} className="text-jb-purple animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-jb-purple">Context Stream</span>
-               </div>
-               <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                  {supervisorInsight || "Awaiting system activity..."}
-               </p>
-            </div>
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-            {/* Reactive Feed */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
-               {activities.length === 0 ? (
-                 <div className="h-full flex flex-col items-center justify-center opacity-20 text-center">
-                    <Activity size={32} className="mb-2 text-slate-500" />
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">No signals detected</p>
-                 </div>
-               ) : (
-                 activities.map((act, i) => (
-                   <div key={i} className="flex gap-3 group">
-                      <div className="flex flex-col items-center gap-1">
-                         <div className="w-5 h-5 rounded-md bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-white/20 transition-colors shrink-0">
-                            <ActivityIcon type={act.type} />
-                         </div>
-                         {i < activities.length - 1 && <div className="w-px flex-1 bg-white/5" />}
-                      </div>
-                      <div className="pb-4 min-w-0">
-                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 truncate">{act.type.replace('_', ' ')}</span>
-                            <span className="text-[8px] font-mono text-slate-700 shrink-0">{new Date(act.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                         </div>
-                         <p className="text-[11px] font-mono text-slate-400 line-clamp-3 group-hover:line-clamp-none transition-all cursor-text break-words">
-                            {act.content || JSON.stringify(act.data)}
-                         </p>
-                      </div>
-                   </div>
-                 ))
-               )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    // Glow effect on AI update
 
-  if (!isOpen) {
-    return (
-        <button 
-            onClick={() => setIsOpen(true)}
-            className="fixed bottom-6 right-6 z-50 p-3 bg-jb-accent text-white rounded-xl shadow-2xl hover:bg-blue-600 transition-all hover:scale-105 group border border-white/10 hover:border-white/20"
-            title="Open Notepad"
-        >
-            <StickyNote size={20} />
-        </button>
-    );
-  }
+    useEffect(() => {
+      if (notepadContent !== lastContent) {
+        setLastContent(notepadContent);
+        
+        // Don't auto-open on the very first load from disk
+        if (isFirstLoad) {
+          setIsFirstLoad(false);
+          return;
+        }
+
+        if (!isOpen) setIsOpen(true); 
+        setGlow(true);
+        setTimeout(() => setGlow(false), 2000);
+      }
+    }, [notepadContent, isFirstLoad, isOpen, lastContent, setIsOpen]);
+
+
+
+  
+
+
+
+    // Real-time Logic Sync with Overseer
+
+
+
+    useEffect(() => {
+
+
+
+      const handleSupervisorUpdate = (analysis: any) => {
+
+
+
+        console.log('[Overseer] State Update Received:', analysis);
+
+
+
+        
+
+
+
+        if (analysis.nodesToAdd) {
+
+
+
+          analysis.nodesToAdd.forEach((n: any) => addGraphNode(n));
+
+
+
+        }
+
+
+
+        if (analysis.edgesToAdd) {
+
+
+
+          analysis.edgesToAdd.forEach((e: any) => addGraphEdge(e));
+
+
+
+        }
+
+
+
+        if (analysis.nodesToRemove) {
+
+
+
+          analysis.nodesToRemove.forEach((id: string) => removeGraphNode(id));
+
+
+
+        }
+
+
+
+        if (analysis.insight) {
+
+
+
+          setSupervisorInsight(analysis.insight);
+
+
+
+        }
+
+
+
+      };
+
+
+
+  
+
+
+
+      socket.on('SUPERVISOR_UPDATE', handleSupervisorUpdate);
+
+
+
+      return () => {
+
+
+
+        socket.off('SUPERVISOR_UPDATE', handleSupervisorUpdate);
+
+
+
+      };
+
+
+
+    }, [addGraphNode, addGraphEdge, removeGraphNode, setSupervisorInsight]);
+
+
+
+  
+
+
+
+        const openPiP = () => {
+
+
+
+  
+
+
+
+          const url = window.location.origin + '?pip=notepad';
+
+
+
+  
+
+
+
+          window.open(url, '_blank', 'width=400,height=600');
+
+
+
+  
+
+
+
+          setIsOpen(false);
+
+
+
+  
+
+
+
+        };
+
+
+
+  
+
+
+
+    if (!isOpen) return null;
 
   return (
-    <>
-        <Rnd
-            size={{ width: size.width, height: size.height }}
-            position={{ x: position.x, y: position.y }}
-            onDragStop={(e, d) => {
-                setPosition({ x: d.x, y: d.y });
-                saveConfig({ x: d.x, y: d.y }, size);
-            }}
-            onResizeStop={(e, direction, ref, delta, position) => {
-                setSize({ width: parseInt(ref.style.width), height: parseInt(ref.style.height) });
-                setPosition(position);
-                saveConfig(position, { width: parseInt(ref.style.width), height: parseInt(ref.style.height) });
-            }}
-            minWidth={300}
-            minHeight={250}
-            bounds="window"
-            dragHandleClassName="notepad-drag-handle"
-            className="z-[100]"
-        >
-            <div className="w-full h-full flex flex-col bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden ring-1 ring-white/5 transition-all">
-                {/* Drag Handle Header */}
-                <div 
-                    className="notepad-drag-handle h-9 bg-white/5 border-b border-white/5 flex items-center justify-between px-3 cursor-grab active:cursor-grabbing shrink-0 select-none"
-                    onDoubleClick={() => setSize({ width: 340, height: 500 })} // Reset size on double click
-                >
-                    <div className="flex items-center gap-2 text-slate-400 group">
-                        <GripHorizontal size={14} className="opacity-50 group-hover:opacity-100 transition-opacity" />
-                        <span className="text-[10px] font-black uppercase tracking-widest group-hover:text-white transition-colors">Solvent OS</span>
-                    </div>
-                    <div className="flex items-center gap-1 app-no-drag" onMouseDown={(e) => e.stopPropagation()}>
-                        <button 
-                            onClick={togglePiP}
-                            className={cn(
-                                "p-1.5 hover:bg-white/10 rounded-md transition-all hover:scale-105",
-                                pipWindow ? "text-jb-purple" : "text-slate-400 hover:text-white"
-                            )}
-                            title={pipWindow ? "Dock Window" : "Pop Out"}
-                        >
-                            {pipWindow ? <Maximize2 size={12} /> : <ExternalLink size={12} />}
-                        </button>
-                        <button 
-                            onClick={() => setIsOpen(false)}
-                            className="p-1.5 hover:bg-red-500/20 rounded-md text-slate-500 hover:text-red-400 transition-all"
-                            title="Close"
-                        >
-                            <X size={12} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Content */}
-                {!pipWindow ? (
-                    <div className="flex-1 overflow-hidden">
-                        {NotepadContent}
-                    </div>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3 bg-black/20">
-                        <div className="w-12 h-12 rounded-full bg-jb-purple/10 flex items-center justify-center border border-jb-purple/20 animate-pulse">
-                            <ExternalLink size={20} className="text-jb-purple" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-white uppercase tracking-widest">External Mode</p>
-                            <p className="text-[10px] text-slate-500 mt-1">Notepad is active in another window.</p>
-                        </div>
-                        <button 
-                            onClick={togglePiP}
-                            className="text-[9px] font-bold text-jb-accent hover:text-white hover:underline uppercase tracking-wider"
-                        >
-                            Bring Back
-                        </button>
-                    </div>
-                )}
+    <Rnd
+      size={{
+        width: size.width,
+        height: size.height
+      }}
+      position={{
+        x: position.x,
+        y: position.y,
+      }}
+      onDragStop={(e, d) => {
+        setPosition({ x: d.x, y: d.y });
+      }}
+      onResizeStop={(e, direction, ref, delta, position) => {
+        setSize({
+          width: ref.offsetWidth,
+          height: ref.offsetHeight,
+        });
+        setPosition(position);
+      }}
+      minWidth={300}
+      minHeight={isMinimized ? 48 : 200}
+      dragHandleClassName="drag-handle"
+      bounds="window"
+      enableResizing={!isMinimized}
+      className="z-50"
+    >
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className={cn(
+           "h-full w-full flex flex-col rounded-2xl overflow-hidden border backdrop-blur-2xl transition-all duration-500",
+           "bg-[#050508]/95 border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)]",
+           glow ? "border-jb-purple/50" : 
+           isProcessing ? "border-jb-accent/30" : ""
+        )}
+      >
+         {/* Header */}
+         <div className="drag-handle flex items-center justify-between px-4 py-3 bg-white/[0.03] border-b border-white/5 cursor-move shrink-0">
+            <div className="flex items-center gap-3">
+               <GripHorizontal size={12} className="text-slate-700" />
+               <div className="flex items-center gap-2">
+                  <Terminal size={14} className="text-jb-purple" />
+                  {!isMinimized && (
+                     <span className="text-[10px] font-black text-white uppercase tracking-widest">Mission Control</span>
+                  )}
+               </div>
             </div>
-        </Rnd>
-        
-        {/* Portal for the PiP Window */}
-        {pipWindow && createPortal(NotepadContent, pipWindow.document.body)}
-    </>
+            
+            <div className="flex items-center gap-1.5">
+               {/* New Integrated Knowledge Map Toggle */}
+               <button 
+                  onClick={() => setShowKnowledgeMap(!showKnowledgeMap)}
+                  className={cn(
+                     "flex items-center gap-2 px-2.5 py-1 rounded-lg border transition-all text-[9px] font-black uppercase tracking-wider",
+                     showKnowledgeMap 
+                        ? "bg-jb-accent/20 border-jb-accent/40 text-jb-accent shadow-[0_0_15px_-5px_rgba(60,113,247,0.5)]" 
+                        : "bg-white/5 border-white/10 text-slate-500 hover:text-white hover:border-white/20"
+                  )}
+                  title="Toggle Logic Knowledge Map"
+               >
+                  {showKnowledgeMap ? <FileText size={12} /> : <Network size={12} className={cn(showKnowledgeMap && "animate-pulse")} />}
+                  {!isMinimized && <span>{showKnowledgeMap ? 'Directives' : 'Logic Map'}</span>}
+               </button>
+
+               <div className="w-[1px] h-4 bg-white/5 mx-1" />
+
+               <button onClick={handleSave} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors" title="Save to Project Memory">
+                  <Save size={14} />
+               </button>
+               <button onClick={openPiP} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors" title="Detach (PiP Mode)">
+                  <ExternalLink size={14} />
+               </button>
+               <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors">
+                  {isMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
+               </button>
+               <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg text-slate-500 transition-all">
+                  <X size={14} />
+               </button>
+            </div>
+         </div>
+
+         {/* Content Area */}
+         <AnimatePresence mode="wait">
+            {!isMinimized && (
+               <motion.div
+                  key={showKnowledgeMap ? 'map' : 'notes'}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 relative flex flex-col overflow-hidden"
+               >
+                  {showKnowledgeMap ? (
+                     <div className="flex-1 flex flex-col relative bg-black/40">
+                        {/* Logic Pulse Background for Map */}
+                        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                           <motion.div 
+                              animate={{ 
+                                 scale: [1, 1.2, 1],
+                                 opacity: [0.03, 0.08, 0.03]
+                              }}
+                              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-jb-purple rounded-full blur-[100px]" 
+                           />
+                        </div>
+
+                        <div className="flex-1 relative z-10">
+                           <Suspense fallback={<div className="flex items-center justify-center h-full"><Network size={24} className="text-jb-purple animate-pulse" /></div>}>
+                              {showKnowledgeMap && <KnowledgeMap />}
+                           </Suspense>
+                        </div>
+
+                        {/* Map HUD Overlay */}
+                        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center text-[8px] font-black text-slate-600 uppercase tracking-widest pointer-events-none bg-black/40 backdrop-blur-md p-2 rounded-lg border border-white/5">
+                           <div className="flex items-center gap-3">
+                              <span className="text-jb-accent">{graphNodes.length} NODES</span>
+                              <span className="w-1 h-1 bg-white/10 rounded-full" />
+                              <span className="text-jb-orange">{graphEdges.length} LINKS</span>
+                           </div>
+                           <span>Logic Mapping Active</span>
+                        </div>
+                     </div>
+                  ) : (
+                     <>
+                        <textarea
+                           value={notepadContent}
+                           onChange={(e) => {
+                              const newContent = e.target.value;
+                              setNotepadContent(newContent);
+                              if (window.electron?.saveNotepad) {
+                                 window.electron.saveNotepad(newContent);
+                              }
+                           }}
+                           placeholder="Mission directive context..."
+                           className="flex-1 bg-transparent p-6 text-xs text-slate-300 resize-none focus:outline-none font-mono leading-relaxed placeholder:text-slate-800"
+                           spellCheck={false}
+                        />
+                        <div className="p-3 px-6 border-t border-white/5 bg-white/[0.01] flex justify-between items-center shrink-0">
+                           <div className="flex items-center gap-2">
+                              <div className={cn("w-1.5 h-1.5 rounded-full", isProcessing ? "bg-jb-orange animate-pulse" : "bg-green-500")} />
+                              <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest">{isProcessing ? 'Processing' : 'Agent Ready'}</span>
+                           </div>
+                           <span className="text-[9px] font-mono text-slate-700 tracking-tighter">{notepadContent.length.toString().padStart(5, '0')} BYTES</span>
+                        </div>
+                     </>
+                  )}
+               </motion.div>
+            )}
+         </AnimatePresence>
+      </motion.div>
+    </Rnd>
   );
 };

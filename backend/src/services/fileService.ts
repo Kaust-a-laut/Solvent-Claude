@@ -1,12 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-// Use require for pdf-parse to avoid TS type issues and call-signature errors in CJS
-const pdf = require('pdf-parse');
+import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
-import { fileURLToPath } from 'url';
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
 
 export class FileService {
   private uploadDir: string;
@@ -33,7 +28,7 @@ export class FileService {
       
       if (mimeType === 'application/pdf' || ext === '.pdf') {
         const dataBuffer = await fs.readFile(filePath);
-        const data = await pdf(dataBuffer);
+        const data = await (pdf as any)(dataBuffer);
         return data.text;
       } 
       
@@ -72,7 +67,7 @@ export class FileService {
           name: file,
           size: stats.size,
           createdAt: stats.birthtime,
-          url: `/files/${file}` // Relative URL, frontend can prepend base
+          url: `/files/${file}`
         };
       }));
 

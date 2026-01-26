@@ -1,51 +1,48 @@
 import ollama from 'ollama';
+import { AIProvider, ChatMessage, CompletionOptions } from '../types/ai';
 
-export class OllamaService {
-  async generateChatCompletion(model: string, messages: any[], temperature: number = 0.7, maxTokens: number = 2048) {
+export class OllamaService implements AIProvider {
+  readonly name = 'ollama';
+
+  async generateChatCompletion(messages: ChatMessage[], options: CompletionOptions): Promise<string> {
     const response = await ollama.chat({
-      model,
+      model: options.model,
       messages: messages.map(m => {
         const msg: any = { role: m.role, content: m.content };
         if (m.image) {
-          // Extract base64 from data URL
           const matches = m.image.match(/^data:(.+);base64,(.+)$/);
-          if (matches) {
-            msg.images = [matches[2]];
-          }
+          if (matches) msg.images = [matches[2]];
         }
         return msg;
       }),
       stream: false,
       options: {
-        temperature,
-        num_predict: maxTokens
+        temperature: options.temperature,
+        num_predict: options.maxTokens
       }
     });
-    return response;
+    return response.message.content;
   }
 
   async listModels() {
     return await ollama.list();
   }
 
-  async *generateChatStream(model: string, messages: any[], temperature: number = 0.7, maxTokens: number = 2048) {
+  async *generateChatStream(messages: ChatMessage[], options: CompletionOptions): AsyncGenerator<string> {
     const response = await ollama.chat({
-      model,
+      model: options.model,
       messages: messages.map(m => {
         const msg: any = { role: m.role, content: m.content };
         if (m.image) {
-          // Extract base64 from data URL
           const matches = m.image.match(/^data:(.+);base64,(.+)$/);
-          if (matches) {
-            msg.images = [matches[2]];
-          }
+          if (matches) msg.images = [matches[2]];
         }
         return msg;
       }),
       stream: true,
       options: {
-        temperature,
-        num_predict: maxTokens
+        temperature: options.temperature,
+        num_predict: options.maxTokens
       }
     });
 

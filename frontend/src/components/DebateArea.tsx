@@ -5,6 +5,7 @@ import { Swords, Bot, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parse } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BentoItem } from './BentoGrid';
 
 export const DebateArea = () => {
   const { deviceInfo } = useAppStore();
@@ -41,15 +42,12 @@ export const DebateArea = () => {
      setRightHistory([]);
 
      try {
-         // Round 1: Gemini Proposes
          const leftResponse = await callModel('gemini', 'gemini-1.5-flash', [], `Present a strong argument for: "${topic}". Be concise and provocative.`);
          setLeftHistory([{ agent: 'Gemini Pro', content: leftResponse }]);
          
-         // Round 1: Ollama Rebuts
          const rightResponse = await callModel('ollama', 'qwen2.5:3b', [], `Critique this argument aggressively: "${leftResponse}". Defend the opposing view.`);
          setRightHistory([{ agent: 'Qwen 2.5', content: rightResponse }]);
          
-         // Round 2: Gemini Counter-Rebuts
          const leftRebuttal = await callModel('gemini', 'gemini-1.5-flash', [], `Your argument was critiqued: "${rightResponse}". Counter this critique effectively.`);
          setLeftHistory(prev => [...prev, { agent: 'Gemini Pro', content: leftRebuttal }]);
 
@@ -63,21 +61,22 @@ export const DebateArea = () => {
 
   return (
     <div className={cn(
-      "flex flex-col h-full bg-jb-dark/50 backdrop-blur-3xl border-white/5 overflow-y-auto shadow-2xl transition-all duration-500",
-      deviceInfo.isMobile ? "p-4 pt-28 pb-32" : "rounded-tl-2xl border-l border-t p-8"
+      "flex flex-col h-full bg-black/20 backdrop-blur-3xl overflow-y-auto scrollbar-thin transition-all duration-500",
+      deviceInfo.isMobile ? "p-4 pt-28 pb-32" : "p-12"
     )}>
       
       <div className={cn(
-        "flex mb-10 gap-6",
+        "flex mb-12 gap-8",
         deviceInfo.isMobile ? "flex-col items-start" : "items-center justify-between"
       )}>
-        <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-jb-pink/20 rounded-2xl flex items-center justify-center border border-jb-pink/30 shrink-0">
-                <Swords className="text-jb-pink" size={24} />
+        <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-jb-pink/10 rounded-[2rem] flex items-center justify-center border border-jb-pink/20 shadow-2xl relative group">
+                <div className="absolute inset-0 bg-jb-pink/20 rounded-[2rem] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Swords className="text-jb-pink relative z-10" size={32} />
             </div>
             <div>
-                <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">Adversarial Debate Lab</h2>
-                <p className="text-[9px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">Cross-Model Dialectical Synthesis</p>
+                <h2 className="text-3xl md:text-4xl font-[900] text-white tracking-tighter">Adversarial Debate <span className="text-vibrant">Lab</span></h2>
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mt-1">Cross-Model Dialectical Synthesis</p>
             </div>
         </div>
 
@@ -85,45 +84,70 @@ export const DebateArea = () => {
           "flex gap-3 w-full",
           deviceInfo.isMobile ? "flex-col" : "md:w-auto"
         )}>
-            <input 
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              className={cn(
-                "bg-white/5 border border-white/10 rounded-xl px-6 py-3 text-sm outline-none focus:border-jb-pink transition-all text-white placeholder:text-slate-600 font-medium",
-                deviceInfo.isMobile ? "w-full" : "w-[400px]"
-              )}
-              placeholder="Enter debate topic..."
-            />
+            <div className="relative group">
+                <input 
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className={cn(
+                    "bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-jb-pink/50 transition-all text-white placeholder:text-slate-600 font-bold backdrop-blur-xl",
+                    deviceInfo.isMobile ? "w-full" : "w-[450px]"
+                  )}
+                  placeholder="Enter debate topic..."
+                />
+            </div>
             <button 
                 onClick={handleStartDebate} 
                 disabled={isDebating}
-                className="bg-jb-pink text-white hover:bg-rose-600 px-8 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-20 shadow-xl"
+                className="bg-jb-pink text-white hover:bg-rose-600 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(244,63,94,0.3)] group"
             >
-                {isDebating ? <RefreshCw className="animate-spin" size={16}/> : <Sparkles size={16}/>}
-                {isDebating ? 'Simulating...' : 'Ignite Debate'}
+                {isDebating ? <RefreshCw className="animate-spin" size={16}/> : <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />}
+                {isDebating ? 'Simulating' : 'Ignite Debate'}
             </button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-3">
-            <AlertCircle size={18} />
-            <span className="font-bold">Error:</span> {error}
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-4 backdrop-blur-md"
+        >
+            <AlertCircle size={20} />
+            <div className="flex flex-col">
+                <span className="font-black uppercase tracking-widest text-[10px]">Simulation Error</span>
+                <span className="font-bold">{error}</span>
+            </div>
+        </motion.div>
       )}
 
       <div className={cn(
-        "grid gap-8 pb-10",
+        "grid gap-8 pb-20",
         deviceInfo.isMobile ? "grid-cols-1" : "grid-cols-2"
       )}>
         
         {/* Gemini Column */}
-        <div className="flex flex-col gap-4 bg-white/2 border border-white/5 rounded-[32px] p-6 overflow-hidden min-h-[300px]">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div className="flex items-center gap-3 text-jb-accent font-black text-xs uppercase tracking-widest">
-                    <Bot size={18} /> Gemini Pro
+        <BentoItem delay={0.1} className={cn(
+          "min-h-[500px] flex flex-col transition-all duration-700",
+          isDebating && leftHistory.length === rightHistory.length ? "border-jb-accent/40 shadow-[0_0_30px_-5px_rgba(60,113,247,0.2)]" : ""
+        )}>
+            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-jb-accent/10 border border-jb-accent/20 text-jb-accent">
+                        <Bot size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-white font-black text-sm uppercase tracking-tight">Gemini Pro</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Aggressive Proponent</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-jb-accent animate-pulse" />
+                {isDebating && leftHistory.length === rightHistory.length && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono font-bold tracking-[0.2em] uppercase text-jb-accent">Thinking</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-jb-accent animate-pulse shadow-[0_0_8px_rgba(60,113,247,0.8)]" />
+                    </div>
+                )}
             </div>
             <div className="flex-1 space-y-6">
                 <AnimatePresence>
@@ -132,22 +156,45 @@ export const DebateArea = () => {
                       key={i} 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-jb-accent/5 border border-jb-accent/20 p-5 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg"
+                      className="bg-jb-accent/5 border border-jb-accent/10 p-6 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg relative overflow-hidden group"
                     >
+                        <div className="absolute top-0 left-0 w-1 h-full bg-jb-accent/40" />
                         <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parse(m.content || '') as string }} />
                     </motion.div>
                   ))}
                 </AnimatePresence>
+                {isDebating && leftHistory.length === rightHistory.length && (
+                   <div className="flex flex-col gap-3 opacity-20">
+                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-3/4" />
+                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-1/2" />
+                   </div>
+                )}
             </div>
-        </div>
+        </BentoItem>
 
         {/* Ollama Column */}
-        <div className="flex flex-col gap-4 bg-white/2 border border-white/5 rounded-[32px] p-6 overflow-hidden min-h-[300px]">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div className="flex items-center gap-3 text-jb-orange font-black text-xs uppercase tracking-widest">
-                    <Bot size={18} /> Qwen 2.5
+        <BentoItem delay={0.2} className={cn(
+          "min-h-[500px] flex flex-col transition-all duration-700",
+          isDebating && leftHistory.length > rightHistory.length ? "border-jb-orange/40 shadow-[0_0_30px_-5px_rgba(249,115,22,0.2)]" : ""
+        )}>
+            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-jb-orange/10 border border-jb-orange/20 text-jb-orange">
+                        <Bot size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-white font-black text-sm uppercase tracking-tight">Qwen 2.5</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Skeptical Opponent</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-jb-orange animate-pulse" />
+                {isDebating && leftHistory.length > rightHistory.length && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono font-bold tracking-[0.2em] uppercase text-jb-orange">Processing</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-jb-orange animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
+                    </div>
+                )}
             </div>
              <div className="flex-1 space-y-6">
                 <AnimatePresence>
@@ -156,14 +203,21 @@ export const DebateArea = () => {
                       key={i} 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-jb-orange/5 border border-jb-orange/20 p-5 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg"
+                      className="bg-jb-orange/5 border border-jb-orange/10 p-6 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg relative overflow-hidden group"
                     >
+                         <div className="absolute top-0 left-0 w-1 h-full bg-jb-orange/40" />
                          <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parse(m.content || '') as string }} />
                     </motion.div>
                   ))}
                 </AnimatePresence>
+                {isDebating && leftHistory.length > rightHistory.length && (
+                   <div className="flex flex-col gap-3 opacity-20">
+                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-3/4" />
+                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-1/2" />
+                   </div>
+                )}
             </div>
-        </div>
+        </BentoItem>
 
       </div>
     </div>

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { API_BASE_URL } from '../lib/config';
-import { GitCompare, Sparkles, RefreshCw, Bot, AlertCircle } from 'lucide-react';
+import { GitCompare, Sparkles, RefreshCw, Bot, AlertCircle, Cloud, Shield } from 'lucide-react';
 import { parse } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/utils';
+import { BentoItem } from './BentoGrid';
 
 export const CompareArea = () => {
   const { deviceInfo } = useAppStore();
@@ -41,21 +42,22 @@ export const CompareArea = () => {
 
   return (
     <div className={cn(
-      "flex flex-col h-full bg-jb-dark/50 backdrop-blur-3xl border-white/5 overflow-y-auto shadow-2xl transition-all duration-500",
-      deviceInfo.isMobile ? "p-4 pt-28 pb-32" : "rounded-tl-2xl border-l border-t p-8"
+      "flex flex-col h-full bg-black/20 backdrop-blur-3xl overflow-y-auto scrollbar-thin transition-all duration-500",
+      deviceInfo.isMobile ? "p-4 pt-28 pb-32" : "p-12"
     )}>
       
       <div className={cn(
-        "flex mb-10 gap-6",
+        "flex mb-12 gap-8",
         deviceInfo.isMobile ? "flex-col items-start" : "items-center justify-between"
       )}>
-        <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-jb-accent/20 rounded-2xl flex items-center justify-center border border-jb-accent/30 shrink-0">
-                <GitCompare className="text-jb-accent" size={24} />
+        <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-jb-accent/10 rounded-[2rem] flex items-center justify-center border border-jb-accent/20 shadow-2xl relative group">
+                <div className="absolute inset-0 bg-jb-accent/20 rounded-[2rem] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                <GitCompare className="text-jb-accent relative z-10" size={32} />
             </div>
             <div>
-                <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">Model Comparison Lab</h2>
-                <p className="text-[9px] md:text-[11px] text-slate-500 font-bold uppercase tracking-widest">Cross-benchmarking Intelligence</p>
+                <h2 className="text-3xl md:text-4xl font-[900] text-white tracking-tighter">Model Comparison <span className="text-vibrant">Lab</span></h2>
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mt-1">Cross-benchmarking Neural Intelligence</p>
             </div>
         </div>
 
@@ -63,72 +65,123 @@ export const CompareArea = () => {
           "flex gap-3 w-full",
           deviceInfo.isMobile ? "flex-col" : "md:w-auto"
         )}>
-            <input 
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCompare()}
-              className={cn(
-                "bg-white/5 border border-white/10 rounded-xl px-6 py-3 text-sm outline-none focus:border-jb-accent transition-all text-white placeholder:text-slate-600 font-medium",
-                deviceInfo.isMobile ? "w-full" : "w-[400px]"
-              )}
-              placeholder="Enter prompt for benchmarking..."
-            />
+            <div className="relative group">
+                <input 
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCompare()}
+                  className={cn(
+                    "bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-jb-accent/50 transition-all text-white placeholder:text-slate-600 font-bold backdrop-blur-xl",
+                    deviceInfo.isMobile ? "w-full" : "w-[450px]"
+                  )}
+                  placeholder="Enter benchmarking objective..."
+                />
+            </div>
             <button 
                 onClick={handleCompare} 
                 disabled={isComparing || !prompt.trim()}
-                className="bg-white text-black hover:bg-jb-accent hover:text-white px-8 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-20 shadow-xl"
+                className="bg-white text-black hover:bg-jb-accent hover:text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(0,0,0,0.3)] group"
             >
-                {isComparing ? <RefreshCw className="animate-spin" size={16}/> : <Sparkles size={16}/>}
-                {isComparing ? 'Processing...' : 'Execute Test'}
+                {isComparing ? <RefreshCw className="animate-spin" size={16}/> : <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />}
+                {isComparing ? 'Processing' : 'Execute Test'}
             </button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-3">
-            <AlertCircle size={18} />
-            <span className="font-bold">Error:</span> {error}
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-4 backdrop-blur-md"
+        >
+            <AlertCircle size={20} />
+            <div className="flex flex-col">
+                <span className="font-black uppercase tracking-widest text-[10px]">Diagnostic Error</span>
+                <span className="font-bold">{error}</span>
+            </div>
+        </motion.div>
       )}
 
       <div className={cn(
-        "grid gap-8 pb-10",
+        "grid gap-8 pb-20",
         deviceInfo.isMobile ? "grid-cols-1" : "grid-cols-2"
       )}>
         
         {/* Gemini Pro Column */}
-        <div className="flex flex-col gap-4 bg-white/2 border border-white/5 rounded-[32px] p-6 overflow-hidden min-h-[300px]">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div className="flex items-center gap-3 text-jb-accent font-black text-xs uppercase tracking-widest">
-                    <Bot size={18} /> Gemini 1.5 Pro
+        <BentoItem delay={0.1} className="min-h-[500px] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-jb-accent/10 border border-jb-accent/20 text-jb-accent">
+                        <Bot size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-white font-black text-sm uppercase tracking-tight">Gemini 1.5 Pro</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <Cloud size={10} className="text-slate-500" />
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Global Cloud Node</span>
+                        </div>
+                    </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-600">CLOUD / GOOGLE</span>
+                <div className="px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black uppercase tracking-widest">
+                   Nominal
+                </div>
             </div>
             <div className="flex-1 text-slate-300">
                 {results ? (
-                    <div className="prose prose-invert prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: parse(results.gemini || '') as string }} />
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="prose prose-invert prose-sm max-w-none leading-relaxed" 
+                      dangerouslySetInnerHTML={{ __html: parse(results.gemini || '') as string }} 
+                    />
                 ) : (
-                    <div className="h-full flex items-center justify-center opacity-20 italic text-sm">Waiting for execution...</div>
+                    <div className="h-full flex flex-col justify-center gap-4 opacity-20">
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-3/4" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-1/2" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-5/6" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-2/3" />
+                    </div>
                 )}
             </div>
-        </div>
+        </BentoItem>
 
         {/* Ollama Column */}
-        <div className="flex flex-col gap-4 bg-white/2 border border-white/5 rounded-[32px] p-6 overflow-hidden min-h-[300px]">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div className="flex items-center gap-3 text-jb-orange font-black text-xs uppercase tracking-widest">
-                    <Bot size={18} /> Qwen 2.5 (Local)
+        <BentoItem delay={0.2} className="min-h-[500px] flex flex-col">
+            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="p-2.5 rounded-xl bg-jb-orange/10 border border-jb-orange/20 text-jb-orange">
+                        <Bot size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-white font-black text-sm uppercase tracking-tight">Qwen 2.5</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <Shield size={10} className="text-slate-500" />
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Private Edge Model</span>
+                        </div>
+                    </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-600">EDGE / PRIVATE</span>
+                <div className="px-3 py-1 rounded-lg bg-jb-orange/10 border border-jb-orange/20 text-jb-orange text-[9px] font-black uppercase tracking-widest">
+                   Local
+                </div>
             </div>
             <div className="flex-1 text-slate-300">
                 {results ? (
-                    <div className="prose prose-invert prose-sm max-w-none leading-relaxed" dangerouslySetInnerHTML={{ __html: parse(results.ollama || '') as string }} />
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="prose prose-invert prose-sm max-w-none leading-relaxed" 
+                      dangerouslySetInnerHTML={{ __html: parse(results.ollama || '') as string }} 
+                    />
                 ) : (
-                    <div className="h-full flex items-center justify-center opacity-20 italic text-sm">Waiting for execution...</div>
+                    <div className="h-full flex flex-col justify-center gap-4 opacity-20">
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-3/4" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-1/2" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-5/6" />
+                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-2/3" />
+                    </div>
                 )}
             </div>
-        </div>
+        </BentoItem>
 
       </div>
     </div>

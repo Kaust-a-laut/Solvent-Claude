@@ -3,7 +3,7 @@ import { useAppStore } from '../store/useAppStore';
 import { 
   MessageSquare, Globe, Brain, Swords, GitCompare, 
   Users, FlaskConical, ScanEye, Search, BookOpen, LineChart, ChevronRight, Settings, Code, Menu, X as CloseIcon,
-  ChevronsLeft, ChevronsRight, PanelLeftClose, PanelLeftOpen
+  ChevronsLeft, ChevronsRight, PanelLeftClose, PanelLeftOpen, Home, Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,37 +67,6 @@ export const Navigation = () => {
         "flex items-center justify-between",
         isCollapsed ? "p-4 flex-col gap-6" : "p-8 pb-10"
       )}>
-        <div className={cn("flex items-center group cursor-pointer", isCollapsed ? "justify-center" : "gap-4")}>
-           <motion.div 
-             whileHover={{ scale: 1.1, rotate: -5 }}
-             className={cn("relative flex items-center justify-center", isCollapsed ? "w-10 h-10" : "w-12 h-12")}
-           >
-              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_15px_rgba(244,63,94,0.5)]">
-                 <defs>
-                    <linearGradient id="beakerFluid" x1="0%" y1="0%" x2="0%" y2="100%">
-                       <stop offset="0%" stopColor="#FB923C" />
-                       <stop offset="50%" stopColor="#F43F5E" />
-                       <stop offset="100%" stopColor="#9D5BD2" />
-                    </linearGradient>
-                    <filter id="glow">
-                       <feGaussianBlur stdDeviation="2" result="blur" />
-                       <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                 </defs>
-                 <path d="M38 20 L38 45 L18 82 Q15 88 22 88 L78 88 Q85 88 82 82 L62 45 L62 20 Z" fill="none" stroke="white" strokeWidth="2" strokeOpacity="0.15" />
-                 <motion.path 
-                    d="M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z" fill="url(#beakerFluid)" fillOpacity="0.9" filter="url(#glow)" />
-                 <path d="M32 20 L68 20" stroke="white" strokeWidth="2" strokeOpacity="0.4" strokeLinecap="round" />
-              </svg>
-           </motion.div>
-           {!isCollapsed && (
-              <div className="flex flex-col">
-                  <h1 className="text-[26px] font-[800] tracking-[-0.04em] text-white leading-none">Solvent</h1>
-                  <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.45em] mt-1.5 ml-0.5 opacity-60">AI Studio</span>
-              </div>
-           )}
-        </div>
-
         {/* Desktop Collapse Toggle */}
         {!isMobile && (
            <button 
@@ -122,14 +91,15 @@ export const Navigation = () => {
       <div className={cn("flex-1 overflow-y-auto scrollbar-hide space-y-10", isCollapsed ? "px-2 space-y-6" : "px-6")}>
         <div className="space-y-1.5">
           {!isCollapsed && <p className="px-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 opacity-40">Modes</p>}
+          <NavItem mode="home" icon={Home} label="Overview" />
           <NavItem mode="chat" icon={MessageSquare} label="Chat" />
-          <NavItem mode="vision" icon={ScanEye} label="Vision" color="text-jb-orange" />
+          <NavItem mode="vision" icon={ScanEye} label="SolventSee Lab" color="text-jb-orange" />
           <NavItem mode="coding" icon={Code} label="Coding Suite" color="text-jb-accent" />
-          <NavItem mode="deep_thought" icon={Brain} label="Thinking" color="text-jb-purple" />
           <NavItem mode="browser" icon={Globe} label="Web Search" color="text-jb-cyan" />
         </div>
         <div className="space-y-1.5">
-           {!isCollapsed && <p className="px-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 opacity-40">Model Lab</p>}
+           {!isCollapsed && <p className="px-4 text-[9px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4 opacity-40">Model Playground</p>}
+           <NavItem mode="model_playground" icon={Sparkles} label="Playground Home" color="text-jb-purple" />
            <NavItem mode="compare" icon={GitCompare} label="Compare" />
            <NavItem mode="debate" icon={Swords} label="Debate" />
            <NavItem mode="collaborate" icon={Users} label="Multi-Agent" />
@@ -137,16 +107,10 @@ export const Navigation = () => {
         </div>
       </div>
 
-      <div className={cn("p-8", isCollapsed ? "p-3" : "")}>
-        {!isCollapsed ? (
-           <SystemStatus />
-        ) : (
-           <div className="flex justify-center">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" title="System Status: Healthy"/>
-           </div>
-        )}
+      <div className={cn("p-8 pt-0", isCollapsed ? "p-3" : "")}>
+        <SystemStatus collapsed={isCollapsed} />
         
-        <div className={cn("mt-6", isCollapsed ? "mt-4" : "")}>
+        <div className={cn("mt-4", isCollapsed ? "mt-4" : "")}>
            <motion.button
              whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', x: isCollapsed ? 0 : 4 }}
              whileTap={{ scale: 0.98 }}

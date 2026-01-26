@@ -57,18 +57,40 @@ export const KnowledgeMap = () => {
 
     const simulation = d3.forceSimulation(graphNodes as any)
       .force("link", d3.forceLink(graphEdges).id((d: any) => d.id).distance(100))
-      .force("charge", d3.forceManyBody().strength(-300))
+      .force("charge", d3.forceManyBody().strength(-400))
       .force("center", d3.forceCenter(width / 2, height / 2))
       .force("x", d3.forceX(width / 2).strength(0.1))
       .force("y", d3.forceY(height / 2).strength(0.1));
 
-    // Define arrow markers
-    svg.append("defs").selectAll("marker")
+    // --- VISUALIZATION HELPERS ---
+    const getNodeColor = (d: any) => {
+      // 1. Crystallized Memory Types
+      if (d.type === 'permanent_rule') return '#F59E0B'; // Gold (Law)
+      if (d.type === 'solution_pattern') return '#06B6D4'; // Cyan (Blueprint)
+      if (d.type === 'architectural_decision') return '#9D5BD2'; // Purple (Wisdom)
+      if (d.type === 'user_preference') return '#EC4899'; // Pink (User)
+
+      // 2. Standard Types
+      if (d.id.startsWith('node_')) return '#3C71F7'; // Standard Blue
+      return '#64748B'; // Slate (Unknown)
+    };
+
+    // Define holographic gradients and filters
+    const defs = svg.append("defs");
+    
+    const nodeGradient = defs.append("radialGradient")
+      .attr("id", "nodeHologram")
+      .attr("cx", "30%")
+      .attr("cy", "30%");
+    nodeGradient.append("stop").attr("offset", "0%").attr("stop-color", "#ffffff").attr("stop-opacity", 0.8);
+    nodeGradient.append("stop").attr("offset", "100%").attr("stop-color", "currentColor").attr("stop-opacity", 0.4);
+
+    defs.selectAll("marker")
       .data(["end"])
       .enter().append("marker")
       .attr("id", String)
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 18)
+      .attr("refX", 22)
       .attr("refY", 0)
       .attr("markerWidth", 6)
       .attr("markerHeight", 6)
@@ -78,14 +100,15 @@ export const KnowledgeMap = () => {
       .attr("fill", "rgba(157, 91, 210, 0.4)");
 
     const link = g.append("g")
-      .attr("stroke", "rgba(157, 91, 210, 0.2)")
-      .attr("stroke-width", 1.5)
       .selectAll("line")
       .data(graphEdges)
       .join("line")
+      .attr("stroke", "rgba(157, 91, 210, 0.15)")
+      .attr("stroke-width", 1)
+      .attr("stroke-dasharray", "4,4")
       .attr("cursor", "pointer")
-      .on("mouseover", function() { d3.select(this).attr("stroke", "#3C71F7").attr("stroke-width", 3); })
-      .on("mouseout", function() { d3.select(this).attr("stroke", "rgba(157, 91, 210, 0.2)").attr("stroke-width", 1.5); })
+      .on("mouseover", function() { d3.select(this).attr("stroke", "#3C71F7").attr("stroke-width", 2).attr("stroke-dasharray", null); })
+      .on("mouseout", function() { d3.select(this).attr("stroke", "rgba(157, 91, 210, 0.15)").attr("stroke-width", 1).attr("stroke-dasharray", "4,4"); })
       .on("click", (event, d) => {
         event.stopPropagation();
         setSelectedEdge(d);
@@ -99,28 +122,31 @@ export const KnowledgeMap = () => {
       .attr("cursor", "grab")
       .call(drag(simulation) as any)
       .on("mouseover", (event, d: any) => {
-         d3.select(event.currentTarget).select("circle:nth-child(1)").attr("r", 10).attr("opacity", 0.8);
+         d3.select(event.currentTarget).select("circle.outer-glow").attr("r", 14).attr("opacity", 0.4);
          setHoveredNode(d);
       })
       .on("mouseout", (event, d) => {
-         d3.select(event.currentTarget).select("circle:nth-child(1)").attr("r", 6).attr("opacity", 0.6);
+         d3.select(event.currentTarget).select("circle.outer-glow").attr("r", 10).attr("opacity", 0.2);
          setHoveredNode(null);
       });
 
-    // Node Outer Glow
+    // Node Outer Glow (Liquid Aura)
+    node.append("circle")
+      .attr("class", "outer-glow")
+      .attr("r", 10)
+      .attr("fill", (d: any) => getNodeColor(d))
+      .attr("filter", "blur(4px)")
+      .attr("opacity", 0.2)
+      .style("transition", "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)");
+
+    // Node Core (Holographic Drop)
     node.append("circle")
       .attr("r", 6)
-      .attr("fill", (d: any) => d.id.startsWith('node_') ? "#3C71F7" : "#9D5BD2")
-      .attr("filter", "blur(2px)")
-      .attr("opacity", 0.6)
-      .style("transition", "all 0.3s ease");
-
-    // Node Core
-    node.append("circle")
-      .attr("r", 4)
-      .attr("fill", (d: any) => d.id.startsWith('node_') ? "#3C71F7" : "#9D5BD2")
-      .attr("stroke", "white")
-      .attr("stroke-width", 1);
+      .attr("fill", "url(#nodeHologram)")
+      .style("color", (d: any) => getNodeColor(d))
+      .attr("stroke", "rgba(255,255,255,0.2)")
+      .attr("stroke-width", 0.5)
+      .style("box-shadow", "inset 0 0 10px rgba(255,255,255,0.5)");
 
     // Labels
     node.append("text")

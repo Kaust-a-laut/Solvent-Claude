@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Cpu, Cloud, Zap, Shield, Sliders, ChevronDown, MessageSquare, ScanEye, Brain, Globe, FlaskConical, CreditCard, ArrowUpRight } from 'lucide-react';
+import { 
+  X, Cpu, Cloud, Zap, Shield, Sliders, ChevronDown, 
+  MessageSquare, ScanEye, Brain, Globe, FlaskConical, 
+  CreditCard, ArrowUpRight, Key, Eye, EyeOff, 
+  Terminal, Sparkles, Code, GitCompare, Swords, Users,
+  RefreshCw, CheckCircle2, AlertCircle, Database
+} from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { API_BASE_URL } from '../lib/config';
 import { cn } from '../lib/utils';
+import { fetchWithRetry } from '../lib/api-client';
 
 export const SettingsModal = () => {
   const { 
@@ -13,306 +20,405 @@ export const SettingsModal = () => {
     maxTokens, setMaxTokens,
     globalProvider, setGlobalProvider,
     deviceInfo,
-    auraMode, setAuraMode
+    auraMode, setAuraMode,
+    apiKeys, setApiKey,
+    selectedCloudModel, setSelectedCloudModel,
+    selectedLocalModel, setSelectedLocalModel,
+    selectedCloudProvider, setSelectedCloudProvider,
+    imageProvider, setImageProvider,
+    localImageUrl, setLocalImageUrl
   } = useAppStore();
 
-  const [availableModels, setAvailableModels] = useState<{ollama: any[], gemini: string[], deepseek: string[]}>({ ollama: [], gemini: [], deepseek: [] });
+  const [activeTab, setActiveTab] = useState<'engine' | 'dynamics' | 'security' | 'intelligence'>('engine');
+  const [availableModels, setAvailableModels] = useState<{
+    ollama: any[], gemini: string[], deepseek: string[], groq: string[], openrouter: string[], puter: string[]
+  }>({ 
+    ollama: [], 
+    gemini: [], 
+    deepseek: [], 
+    groq: [], 
+    openrouter: [], 
+    puter: ['deepseek-chat', 'deepseek-coder', 'claude-3-5-sonnet', 'gpt-4o'] 
+  });
+  
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [validationStatus, setValidationStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
+  const [errorLog, setErrorLog] = useState<string[]>([]);
 
+  const logError = useCallback((msg: string) => {
+    console.error(`[Settings] ${msg}`);
+    setErrorLog(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 10));
+  }, []);
+
+  const [serviceHealth, setServiceHealth] = useState<{ ollama: 'connected' | 'disconnected', timestamp?: string }>({ ollama: 'disconnected' });
+  
   useEffect(() => {
     if (settingsOpen) {
-      fetch(`${API_BASE_URL}/models`)
-        .then(res => res.json())
-        .then(data => setAvailableModels(data))
-        .catch(err => console.error("Failed to fetch models", err));
+      const checkHealth = async () => {
+        try {
+          const health = await fetchWithRetry(`${API_BASE_URL}/health/services`);
+          setServiceHealth(health);
+        } catch (e) {
+          setServiceHealth({ ollama: 'disconnected' });
+        }
+      };
+      checkHealth();
+      const interval = setInterval(checkHealth, 10000);
+      return () => clearInterval(interval);
     }
   }, [settingsOpen]);
 
+  const toggleKeyVisibility = (providerId: string) => {
+    setShowKeys(prev => ({ ...prev, [providerId]: !prev[providerId] }));
+  };
+
+  const fetchModels = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const data = await fetchWithRetry(`${API_BASE_URL}/models`);
+      setAvailableModels(prev => ({
+        ...prev,
+        ollama: data.ollama || [],
+        gemini: data.gemini || [],
+        deepseek: data.deepseek || [],
+        groq: data.groq || [],
+        openrouter: data.openrouter || []
+      }));
+    } catch (err: any) {
+      logError(`Model fetch failed: ${err.message}`);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [logError]);
+
+  useEffect(() => {
+    if (settingsOpen) fetchModels();
+  }, [settingsOpen, fetchModels]);
+
   if (!settingsOpen) return null;
 
-  const modes = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
-    { id: 'vision', label: 'Vision', icon: ScanEye },
-    { id: 'deep_thought', label: 'Thinking', icon: Brain },
-    { id: 'browser', label: 'Web Search', icon: Globe },
-    { id: 'waterfall', label: 'Waterfall', icon: FlaskConical },
-  ];
+  const detectProvider = (model: string): string => {
+    if (!model || model === 'auto') return 'auto';
+    const m = model.toLowerCase();
+    
+    // Exact matches first from available models
+    if (availableModels.puter.includes(model)) return 'puter';
+    if (availableModels.groq.includes(model)) return 'groq';
+    if (availableModels.deepseek.includes(model)) return 'deepseek';
+    if (availableModels.gemini.includes(model)) return 'gemini';
+    if (availableModels.openrouter.includes(model)) return 'openrouter';
+    if (availableModels.ollama.some(opt => (opt.name || opt) === model)) return 'ollama';
+
+    // Heuristics for unknown but likely models
+    if (m.includes('llama') || m.includes('gemma2') || m.includes('groq/')) return 'groq';
+    if (m.includes('deepseek')) return 'deepseek';
+    if (m.includes('/') || m.includes(':free')) return 'openrouter';
+    if (m.includes('gemini')) return 'gemini';
+    
+    return 'gemini';
+  };
+
+  const handleGlobalCloudModelChange = (model: string) => {
+    setSelectedCloudModel(model);
+    const provider = detectProvider(model);
+    setSelectedCloudProvider(provider as any);
+  };
+
+  const handleModeModelChange = (modeId: string, model: string) => {
+    const provider = detectProvider(model);
+    setModeConfig(modeId, { provider, model: model === 'auto' ? selectedCloudModel : model });
+  };
+
+  const validateKey = async (provider: string) => {
+    const key = apiKeys[provider];
+    if (!key) return;
+    setValidationStatus(prev => ({ ...prev, [provider]: 'loading' }));
+    try {
+      await fetchWithRetry(`${API_BASE_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, model: 'ping', messages: [{ role: 'user', content: 'hi' }], apiKeys: { [provider]: key }, maxTokens: 1 })
+      });
+      setValidationStatus(prev => ({ ...prev, [provider]: 'success' }));
+    } catch (err: any) {
+      setValidationStatus(prev => ({ ...prev, [provider]: 'error' }));
+    }
+  };
+
+  const TabButton = ({ id, label, icon: Icon }: any) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={cn(
+        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group",
+        activeTab === id ? "bg-white/5 text-white shadow-xl" : "text-slate-500 hover:text-slate-300"
+      )}
+    >
+      <Icon size={16} className={cn(activeTab === id ? "text-jb-accent" : "text-slate-600")} />
+      <span className="text-[11px] font-black uppercase tracking-widest">{label}</span>
+      {activeTab === id && <motion.div layoutId="tabGlow" className="ml-auto w-1 h-1 rounded-full bg-jb-accent shadow-[0_0_10px_rgba(60,113,247,1)]" />}
+    </button>
+  );
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-[100] flex items-center justify-center",
-      deviceInfo.isMobile ? "p-0" : "p-6"
-    )}>
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setSettingsOpen(false)}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
-      />
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSettingsOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
       
       <motion.div 
-        initial={deviceInfo.isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={deviceInfo.isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0, y: 20 }}
-        className={cn(
-          "w-full bg-[#050508] border-white/10 shadow-2xl relative overflow-hidden flex flex-col transition-all duration-500",
-          deviceInfo.isMobile 
-            ? "h-full rounded-t-[32px] mt-20" 
-            : "max-w-3xl rounded-[32px] max-h-[90vh] border"
-        )}
+        initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="w-full max-w-5xl h-[80vh] bg-[#050508] border border-white/5 rounded-[40px] shadow-2xl relative overflow-hidden flex"
       >
-        {/* Modal Header */}
-        <div className={cn(
-          "border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0",
-          deviceInfo.isMobile ? "p-6" : "p-8"
-        )}>
-           <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-jb-accent/20 flex items-center justify-center border border-jb-accent/30 text-jb-accent shrink-0">
-                 <Sliders size={20} />
+        {/* Left Navigation */}
+        <div className="w-64 border-r border-white/5 bg-white/[0.01] p-8 flex flex-col gap-8">
+           <div className="flex flex-col gap-1 px-2">
+              <h2 className="text-xl font-black text-white tracking-tighter italic">SYNT_CORE</h2>
+              <p className="text-[8px] font-black text-slate-600 uppercase tracking-[0.4em]">Engine Overrides</p>
+           </div>
+
+           <nav className="flex flex-col gap-2">
+              <TabButton id="engine" label="Engine Matrix" icon={Cpu} />
+              <TabButton id="intelligence" label="Project Memory" icon={Brain} />
+              <TabButton id="dynamics" label="Core Dynamics" icon={Zap} />
+              <TabButton id="security" label="Security Link" icon={Shield} />
+           </nav>
+
+           <div className="mt-auto bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">System Status</span>
+                <div className="flex items-center gap-1.5">
+                   <span className="relative flex h-2 w-2">
+                     <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", serviceHealth.ollama === 'connected' ? "bg-emerald-400" : "bg-rose-500")}></span>
+                     <span className={cn("relative inline-flex rounded-full h-2 w-2", serviceHealth.ollama === 'connected' ? "bg-emerald-500" : "bg-rose-600")}></span>
+                   </span>
+                </div>
               </div>
-              <div>
-                 <h2 className="text-lg md:text-xl font-black text-white tracking-tight">AI Configuration</h2>
-                 <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1">Laboratory Parameters</p>
+              
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/5">
+                   <span className="text-[9px] font-bold text-slate-400">Local Node (Ollama)</span>
+                   <span className={cn("text-[9px] font-black uppercase tracking-widest", serviceHealth.ollama === 'connected' ? "text-emerald-400" : "text-rose-400")}>
+                      {serviceHealth.ollama === 'connected' ? 'Online' : 'Offline'}
+                   </span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/5">
+                   <span className="text-[9px] font-bold text-slate-400">Cloud Uplink</span>
+                   <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Active</span>
+                </div>
               </div>
            </div>
-           <button 
-             onClick={() => setSettingsOpen(false)}
-             className="p-2 hover:bg-white/5 rounded-xl text-slate-500 hover:text-white transition-all"
-           >
-              <X size={20} />
-           </button>
         </div>
 
-        <div className={cn(
-          "flex-1 overflow-y-auto space-y-12 scrollbar-thin",
-          deviceInfo.isMobile ? "p-6" : "p-8"
-        )}>
-           
-           {/* Global Provider Selection */}
-           <div className="space-y-6">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-1">Global System Architecture</h3>
-              <div className={cn(
-                "grid gap-4",
-                deviceInfo.isMobile ? "grid-cols-1" : "grid-cols-3"
-              )}>
-                 {[
-                   { id: 'cloud', label: 'Cloud Prime', icon: Cloud, desc: 'Gemini/DeepSeek' },
-                   { id: 'local', label: 'Local Node', icon: Cpu, desc: 'Ollama Instance' },
-                   { id: 'auto', label: 'Smart Hybrid', icon: Zap, desc: 'Router Control' },
-                 ].map((p) => {
-                    const active = (globalProvider || 'auto') === p.id;
-                    return (
-                       <button
-                         key={p.id}
-                         onClick={() => setGlobalProvider(p.id as any)}
-                         className={cn(
-                           "p-5 rounded-2xl border transition-all text-left group relative overflow-hidden",
-                           active 
-                             ? "bg-white/[0.04] border-white/20 shadow-xl" 
-                             : "bg-transparent border-white/5 opacity-40 hover:opacity-100"
-                         )}
-                       >
-                          {active && <div className="absolute top-0 right-0 w-12 h-12 bg-white/5 blur-xl rounded-full -mr-4 -mt-4" />}
-                          <p.icon size={20} className={cn("mb-3", active ? "text-white" : "text-slate-500")} />
-                          <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">{p.label}</h4>
-                          <p className="text-[10px] text-slate-500 font-bold">{p.desc}</p>
-                       </button>
-                    );
-                 })}
+        {/* Right Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+           <header className="p-8 pb-4 border-b border-white/5 flex items-center justify-between">
+              <div className="flex flex-col">
+                 <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">
+                    {activeTab === 'engine' ? 'Neural Engine Configuration' : 
+                     activeTab === 'intelligence' ? 'Recursive Knowledge Index' :
+                     activeTab === 'dynamics' ? 'System Fluidity & Aura' : 'Cryptographic API Matrix'}
+                 </h3>
+                 <p className="text-[10px] font-bold text-slate-500 mt-1">Adjusting real-time inference parameters</p>
               </div>
-           </div>
+              <button onClick={() => setSettingsOpen(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-all"><X size={20} /></button>
+           </header>
 
-           {/* Mode Specific Config */}
-           <div className="space-y-6">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-1">Mode Assignments</h3>
-              <div className="grid grid-cols-1 gap-4">
-                 {modes.map((mode) => {
-                    const config = modeConfigs[mode.id] || { provider: 'auto', model: 'gemini-3-pro-preview' };
-                    return (
-                       <div key={mode.id} className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 md:p-5 flex flex-col gap-4">
-                          <div className={cn(
-                            "flex items-center justify-between",
-                            deviceInfo.isMobile ? "flex-col items-start gap-4" : ""
-                          )}>
-                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-400">
-                                   <mode.icon size={16} />
-                                </div>
-                                <span className="font-bold text-white text-sm">{mode.label}</span>
-                             </div>
-                             
-                             <div className="flex bg-black/40 rounded-lg p-1 border border-white/5 w-full md:w-auto overflow-x-auto scrollbar-hide">
-                                {['auto', 'gemini', 'deepseek', 'ollama'].map((p) => (
-                                   <button
-                                     key={p}
-                                     onClick={() => setModeConfig(mode.id, { ...config, provider: p as any })}
-                                     className={cn(
-                                       "px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
-                                       config.provider === p 
-                                         ? "bg-white/10 text-white shadow-sm" 
-                                         : "text-slate-600 hover:text-slate-400"
-                                     )}
-                                   >
-                                      {p}
-                                   </button>
-                                ))}
-                             </div>
-                          </div>
-
-                          {config.provider !== 'auto' && (
-                             <div className="relative group">
-                                <select 
-                                  value={config.model}
-                                  onChange={(e) => setModeConfig(mode.id, { ...config, model: e.target.value })}
-                                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-300 outline-none appearance-none focus:border-white/20 transition-all cursor-pointer"
-                                >
-                                   {config.provider === 'gemini' ? (
-                                      (availableModels?.gemini || ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-1.5-pro']).map(m => (
-                                        <option key={m} value={m} className="bg-[#050508]">{m}</option>
-                                      ))
-                                   ) : config.provider === 'deepseek' ? (
-                                      (availableModels?.deepseek || ['deepseek-chat', 'deepseek-coder']).map(m => (
-                                        <option key={m} value={m} className="bg-[#050508]">{m}</option>
-                                      ))
-                                   ) : (
-                                      (availableModels?.ollama || []).map((m: any) => (
-                                        <option key={m.name} value={m.name} className="bg-[#050508]">{m.name}</option>
-                                      ))
-                                   )}
-                                </select>
-                                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
-                             </div>
-                          )}
+           <div className="flex-1 overflow-y-auto p-10 scrollbar-thin scroll-smooth focusable-container" tabIndex={0}>
+              {activeTab === 'engine' && (
+                 <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <section className="space-y-6">
+                       <h4 className="text-[10px] font-black text-jb-accent uppercase tracking-[0.4em]">Global Routing</h4>
+                       <div className="grid grid-cols-3 gap-4">
+                          {[
+                            { id: 'cloud', label: 'Cloud Prime', desc: 'Gemini / Groq / Puter' },
+                            { id: 'local', label: 'Local Node', desc: 'Private Ollama' },
+                            { id: 'auto', label: 'Smart Hybrid', desc: 'Auto Router' }
+                          ].map(p => (
+                             <button 
+                                key={p.id} 
+                                onClick={() => setGlobalProvider(p.id as any)}
+                                className={cn(
+                                  "p-6 rounded-3xl border text-left transition-all relative overflow-hidden group",
+                                  globalProvider === p.id ? "bg-white/[0.04] border-white/20" : "bg-transparent border-white/5 opacity-40 hover:opacity-100"
+                                )}
+                             >
+                                <span className="text-xs font-black text-white uppercase block mb-1">{p.label}</span>
+                                <span className="text-[9px] text-slate-500 font-bold">{p.desc}</span>
+                                {globalProvider === p.id && <div className="absolute top-0 right-0 w-16 h-16 bg-jb-accent/10 blur-2xl rounded-full" />}
+                             </button>
+                          ))}
                        </div>
-                    );
-                 })}
-              </div>
-           </div>
+                    </section>
 
-           {/* Interface & Theme */}
-           <div className="space-y-6">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-1">Interface & Theme</h3>
-              <div className={cn(
-                "bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-center justify-between",
-                deviceInfo.isMobile ? "flex-col gap-6" : ""
-              )}>
-                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-jb-pink/20 flex items-center justify-center border border-jb-pink/30 text-jb-pink shrink-0">
-                       <Zap size={20} />
-                    </div>
-                    <div>
-                       <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">Aura Synthesis</h4>
-                       <p className="text-[10px] text-slate-500 font-bold">
-                          {auraMode === 'organic' ? 'Dynamic, adaptive resource scaling' : 
-                           auraMode === 'static' ? 'Predictable, fixed resource allocation' : 
-                           'Maximum performance / Minimum overhead'}
-                       </p>
+                    <section className="space-y-6">
+                       <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Visual Synthesis Engine</h4>
+                       <div className="grid grid-cols-2 gap-4">
+                          {[
+                            { id: 'gemini', label: 'Gemini Imagen', desc: 'Imagen 3.0 High-Fidelity' },
+                            { id: 'huggingface', label: 'Hugging Face', desc: 'Free SDXL / No Watermark' },
+                            { id: 'local', label: 'Local SDXL', desc: 'Juggernaut XL / Local Node' },
+                            { id: 'pollinations', label: 'Pollinations', desc: 'Open-Source Fallback' }
+                          ].map(p => (
+                             <button 
+                                key={p.id} 
+                                onClick={() => setImageProvider(p.id as any)}
+                                className={cn(
+                                  "p-5 rounded-3xl border text-left transition-all relative overflow-hidden group",
+                                  imageProvider === p.id ? "bg-white/[0.04] border-white/20 shadow-lg" : "bg-transparent border-white/5 opacity-40 hover:opacity-100"
+                                )}
+                             >
+                                <span className="text-[10px] font-black text-white uppercase block mb-1">{p.label}</span>
+                                <span className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">{p.desc}</span>
+                                                             </button>
+                                                          ))}
+                                                       </div>
+                                                       
+                                                       {imageProvider === 'local' && (
+                                                          <div className="mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                             <div className="flex items-center gap-4 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
+                                                                <Globe size={16} className="text-slate-500" />
+                                                                <div className="flex-1">
+                                                                   <label className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-1">Local Node Endpoint</label>
+                                                                   <input 
+                                                                      type="text" 
+                                                                      value={localImageUrl} 
+                                                                      onChange={(e) => setLocalImageUrl(e.target.value)}
+                                                                      placeholder="http://127.0.0.1:7860/sdapi/v1/txt2img"
+                                                                      className="w-full bg-transparent border-none outline-none text-[11px] font-mono text-indigo-400 placeholder:text-slate-700"
+                                                                   />
+                                                                </div>
+                                                                <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/5 text-[8px] font-black text-slate-500 uppercase">A1111 / WebUI</div>
+                                                             </div>
+                                                          </div>
+                                                       )}
+                                                    </section>
+                    <section className="space-y-6">
+                       <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Default Engine Tiers</h4>
+                       <div className="grid grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Cloud Powerhouse</label>
+                             <select value={selectedCloudModel} onChange={e => handleGlobalCloudModelChange(e.target.value)} className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-slate-300 outline-none hover:border-white/20 transition-all cursor-pointer">
+                                <optgroup label="Puter.js (Free)" className="bg-[#050508]">
+                                   {availableModels.puter.map(m => <option key={m} value={m}>{m}</option>)}
+                                </optgroup>
+                                <optgroup label="Google Gemini" className="bg-[#050508]">
+                                   {availableModels.gemini.map(m => <option key={m} value={m}>{m}</option>)}
+                                </optgroup>
+                                <optgroup label="Groq LPU" className="bg-[#050508]">
+                                   {availableModels.groq.map(m => <option key={m} value={m}>{m}</option>)}
+                                </optgroup>
+                             </select>
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Local Intelligence</label>
+                             <select value={selectedLocalModel} onChange={e => setSelectedLocalModel(e.target.value)} className="w-full bg-white/[0.03] border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-slate-300 outline-none hover:border-white/20 transition-all cursor-pointer">
+                                {availableModels.ollama.map((m: any) => <option key={m.name || m} value={m.name || m}>{m.name || m}</option>)}
+                             </select>
+                          </div>
+                       </div>
+                    </section>
+                 </div>
+              )}
+
+              {activeTab === 'intelligence' && (
+                 <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <div className="bg-jb-purple/5 border border-jb-purple/20 rounded-[32px] p-8 flex items-center justify-between">
+                       <div className="flex gap-6 items-center">
+                          <div className="w-16 h-16 rounded-2xl bg-jb-purple/20 flex items-center justify-center border border-jb-purple/30 text-jb-purple shadow-[0_0_30px_rgba(157,91,210,0.2)]">
+                             <Database size={32} />
+                          </div>
+                          <div>
+                             <h4 className="text-lg font-black text-white tracking-tight">Project Memory Resync</h4>
+                             <p className="text-xs text-slate-500 font-bold max-w-xs leading-relaxed">Recursively index your local workspace to enable 'Solver Memory' across all agents.</p>
+                          </div>
+                       </div>
+                       <button 
+                         onClick={async () => {
+                           await fetchWithRetry(`${API_BASE_URL}/index`, { method: 'POST' });
+                           alert('Neural Indexing sequence initiated.');
+                         }}
+                         className="px-8 py-4 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
+                       >
+                          Initiate Scan
+                       </button>
                     </div>
                  </div>
-                 
-                 <div className="flex bg-black/40 rounded-xl p-1 border border-white/5">
-                    {[
-                      { id: 'off', label: 'Off' },
-                      { id: 'static', label: 'Static' },
-                      { id: 'organic', label: 'Organic' },
-                    ].map((opt) => (
-                       <button
-                         key={opt.id}
-                         onClick={() => setAuraMode(opt.id as any)}
-                         className={cn(
-                           "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                           auraMode === opt.id 
-                             ? "bg-white/10 text-white shadow-xl" 
-                             : "text-slate-600 hover:text-slate-400"
-                         )}
-                       >
-                          {opt.label}
-                       </button>
+              )}
+
+              {activeTab === 'dynamics' && (
+                 <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-500">
+                    <section className="space-y-8">
+                       <div className="flex justify-between items-end">
+                          <div>
+                             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Inference Creativity</h4>
+                             <p className="text-[9px] text-slate-600 font-bold mt-1">Adjusts the 'Temperature' of neural responses</p>
+                          </div>
+                          <span className="text-lg font-mono text-jb-accent">{temperature}</span>
+                       </div>
+                       <input type="range" min="0" max="1" step="0.1" value={temperature} onChange={e => setTemperature(parseFloat(e.target.value))} className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-jb-accent" />
+                    </section>
+
+                    <section className="space-y-8">
+                       <div className="flex justify-between items-end">
+                          <div>
+                             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Signal Context Window</h4>
+                             <p className="text-[9px] text-slate-600 font-bold mt-1">Maximum token allocation per request</p>
+                          </div>
+                          <span className="text-lg font-mono text-jb-purple">{maxTokens}</span>
+                       </div>
+                       <input type="range" min="512" max="16384" step="512" value={maxTokens} onChange={e => setMaxTokens(parseInt(e.target.value))} className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-jb-purple" />
+                    </section>
+
+                    <section className="space-y-6 pt-6 border-t border-white/5">
+                       <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em]">Environmental Aura</h4>
+                       <div className="flex gap-4">
+                          {[
+                            { id: 'off', label: 'Minimalist', desc: 'Deep Black' },
+                            { id: 'static', label: 'Static', desc: 'Predictable' },
+                            { id: 'organic', label: 'Organic', desc: 'Dynamic Fluid' }
+                          ].map(mode => (
+                             <button
+                                key={mode.id}
+                                onClick={() => setAuraMode(mode.id as any)}
+                                className={cn(
+                                  "flex-1 p-5 rounded-2xl border text-left transition-all relative overflow-hidden group",
+                                  auraMode === mode.id ? "bg-white/[0.04] border-white/20 shadow-lg" : "bg-transparent border-white/5 opacity-40 hover:opacity-100"
+                                )}
+                             >
+                                <span className="text-[11px] font-black text-white uppercase block mb-1 tracking-wider">{mode.label}</span>
+                                <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest">{mode.desc}</span>
+                                {auraMode === mode.id && <div className="absolute top-0 right-0 w-8 h-8 bg-jb-accent/10 blur-xl rounded-full" />}
+                             </button>
+                          ))}
+                       </div>
+                    </section>
+                 </div>
+              )}
+
+              {activeTab === 'security' && (
+                 <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                    {['gemini', 'groq', 'deepseek', 'openrouter', 'huggingface'].map(provider => (
+                       <div key={provider} className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 flex flex-col gap-4">
+                          <div className="flex items-center justify-between">
+                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{provider} ACCESS_KEY</span>
+                             <button onClick={() => toggleKeyVisibility(provider)} className="text-slate-600 hover:text-white transition-colors">{showKeys[provider] ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                          </div>
+                          <div className="flex gap-3">
+                             <input type={showKeys[provider] ? "text" : "password"} value={apiKeys[provider] || ''} onChange={e => setApiKey(provider, e.target.value)} placeholder="Enter Override Key..." className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 py-3 text-xs font-mono text-indigo-400 outline-none focus:border-indigo-500/50 transition-all" />
+                             <button onClick={() => validateKey(provider)} className="px-6 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all">Verify</button>
+                          </div>
+                       </div>
                     ))}
                  </div>
+              )}
+           </div>
+
+           <footer className="p-8 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                 <Shield size={14} className="text-slate-700" />
+                 <span className="text-[9px] font-black text-slate-700 uppercase tracking-widest">Protocol Protected - Local Session Only</span>
               </div>
-           </div>
-
-           {/* Global Parameters */}
-           <div className="space-y-8 pt-4 border-t border-white/5">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-1">Global Parameters</h3>
-              <div className={cn(
-                "grid gap-10",
-                deviceInfo.isMobile ? "grid-cols-1" : "grid-cols-2"
-              )}>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Temperature</label>
-                       <span className="text-xs font-mono text-jb-accent">{temperature}</span>
-                    </div>
-                    <input 
-                      type="range" min="0" max="1" step="0.1" 
-                      value={temperature}
-                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-jb-accent"
-                    />
-                 </div>
-                 <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] ml-1">Max Tokens</label>
-                       <span className="text-xs font-mono text-jb-purple">{maxTokens}</span>
-                    </div>
-                    <input 
-                      type="range" min="512" max="8192" step="512" 
-                      value={maxTokens}
-                      onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-jb-purple"
-                    />
-                 </div>
-              </div>
-           </div>
-
-           {/* Billing & Limits */}
-           <div className="space-y-6 pt-4 border-t border-white/5">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] ml-1">Billing & Limits</h3>
-              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex items-center justify-between">
-                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center border border-green-500/30 text-green-400 shrink-0">
-                       <CreditCard size={20} />
-                    </div>
-                    <div>
-                       <h4 className="text-xs font-black text-white uppercase tracking-wider mb-1">OpenRouter Free Tier</h4>
-                       <p className="text-[10px] text-slate-500 font-bold">Limit: 20 reqs/min (Current: Free)</p>
-                    </div>
-                 </div>
-                 
-                 <a 
-                   href="https://openrouter.ai/credits" 
-                   target="_blank" 
-                   rel="noreferrer"
-                   className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl transition-all group"
-                 >
-                    <span className="text-[10px] font-black uppercase tracking-widest">Top Up</span>
-                    <ArrowUpRight size={12} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                 </a>
-              </div>
-           </div>
-
-        </div>
-
-        {/* Modal Footer */}
-        <div className={cn(
-          "bg-white/[0.02] border-t border-white/5 flex items-center justify-between shrink-0",
-          deviceInfo.isMobile ? "p-6 flex-col gap-6" : "p-8"
-        )}>
-           <div className="flex items-center gap-2 text-[9px] font-black text-slate-600 uppercase tracking-widest">
-              <Shield size={12} />
-              <span>Configuration locked to local session</span>
-           </div>
-           <button 
-             onClick={() => setSettingsOpen(false)}
-             className={cn(
-               "bg-white text-black rounded-xl font-bold text-xs hover:bg-slate-200 transition-all shadow-xl",
-               deviceInfo.isMobile ? "w-full py-4" : "px-8 py-3"
-             )}
-           >
-              Synchronize
-           </button>
+              <button onClick={() => setSettingsOpen(false)} className="px-10 py-3 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all shadow-2xl">Synchronize</button>
+           </footer>
         </div>
       </motion.div>
     </div>
