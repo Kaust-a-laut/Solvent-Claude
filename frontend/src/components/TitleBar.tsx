@@ -92,7 +92,7 @@ export const TitleBar = () => {
             <input 
               type="text" 
               placeholder="Search // Command Solvent..." 
-              className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-white placeholder:text-slate-800"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-white placeholder:text-slate-600"
             />
                  <div className="flex items-center gap-2">
                     <div className="px-1.5 py-0.5 rounded-md bg-black border border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest">

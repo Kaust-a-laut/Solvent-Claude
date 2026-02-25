@@ -16,6 +16,16 @@ export const Navigation = () => {
 
   const isMobile = deviceInfo.isMobile;
 
+  const getActiveIconClass = (color?: string): string => {
+    const glowMap: Record<string, string> = {
+      'text-jb-accent': 'text-jb-accent drop-shadow-[0_0_8px_rgba(60,113,247,0.6)]',
+      'text-jb-purple': 'text-jb-purple drop-shadow-[0_0_8px_rgba(157,91,210,0.6)]',
+      'text-jb-orange': 'text-jb-orange drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]',
+      'text-jb-cyan': 'text-jb-cyan drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]',
+    };
+    return glowMap[color || 'text-jb-accent'] ?? 'text-jb-accent drop-shadow-[0_0_8px_rgba(60,113,247,0.6)]';
+  };
+
   const NavItem = ({ mode, icon: Icon, label, color }: any) => {
     const isActive = currentMode === mode;
     return (
@@ -43,7 +53,7 @@ export const Navigation = () => {
         )}
         
         <div className={cn("flex items-center relative z-10", isCollapsed ? "justify-center" : "gap-3")}>
-          <Icon size={18} className={cn("transition-all duration-500", isActive ? (color || "text-jb-accent shadow-[0_0_10px_rgba(60,113,247,0.5)]") : "group-hover:text-slate-300")} />
+          <Icon size={18} className={cn("transition-all duration-500", isActive ? getActiveIconClass(color) : "group-hover:text-slate-300")} />
           {!isCollapsed && (
              <span className={cn("font-bold text-[13px] tracking-tight transition-colors duration-300 whitespace-nowrap", isActive ? "text-white" : "font-semibold")}>{label}</span>
           )}

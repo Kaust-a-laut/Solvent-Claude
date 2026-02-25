@@ -180,51 +180,34 @@ export const HomeArea = () => {
                     </filter>
                  </defs>
                  <path d="M38 20 L38 45 L18 82 Q15 88 22 88 L78 88 Q85 88 82 82 L62 45 L62 20 Z" fill="none" stroke="white" strokeWidth="0.75" strokeOpacity="0.25" />
-                                          <motion.path 
-                                             animate={{ 
-                                               d: [
-                                                 "M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z",
-                                                 "M40 51 L25 83 Q23 86 27 86 L73 86 Q77 86 75 83 L60 51 Q58 48 50 48 Q42 48 40 51 Z",
-                                                 "M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z"
-                                               ]
-                                             }}
-                                             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                                             fill="url(#beakerFluidLarge)" fillOpacity="0.95" filter="url(#glowLarge)" />
-                                          <path d="M32 20 L68 20" stroke="white" strokeWidth="2.5" strokeOpacity="0.5" strokeLinecap="round" />
-                                          
-                                                                                            {/* Brand Text Inside Beaker - Animated and Matched Font */}
-                                          
-                                                                                            <motion.g
-                                          
-                                                                                               animate={{ 
-                                          
-                                                                                                  y: [0, 1.5, 0]
-                                          
-                                                                                               }}
-                                          
-                                                                                               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                                          
-                                                                                            >
-                                          
-                                                                                                                           <text x="50" y="65" textAnchor="middle" fill="white" fontSize="5.5" fontWeight="900" 
-                                          
-                                                                                                                                 style={{ fontFamily: 'Inter Tight, sans-serif', letterSpacing: '0.15em', filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' }}>
-                                          
-                                                                                                                              SOLVENT
-                                          
-                                                                                                                           </text>
-                                          
-                                                                                                                           <text x="50" y="71" textAnchor="middle" fill="black" fillOpacity="0.5" fontSize="1.8" fontWeight="900" 
-                                          
-                                                                                                                                 style={{ fontFamily: 'Inter Tight, sans-serif', letterSpacing: '0.25em' }}>
-                                          
-                                                                                                                              BY KAUSTIKSOLUTIONS
-                                          
-                                                                                                                           </text>
-                                          
-                                                                                            </motion.g>
-                                          
-                                                                                         </svg>           </motion.div>
+                 <motion.path
+                   animate={{
+                     d: [
+                       "M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z",
+                       "M40 51 L25 83 Q23 86 27 86 L73 86 Q77 86 75 83 L60 51 Q58 48 50 48 Q42 48 40 51 Z",
+                       "M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z"
+                     ]
+                   }}
+                   transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                   fill="url(#beakerFluidLarge)" fillOpacity="0.95" filter="url(#glowLarge)"
+                 />
+                 <path d="M32 20 L68 20" stroke="white" strokeWidth="2.5" strokeOpacity="0.5" strokeLinecap="round" />
+                 {/* Brand Text Inside Beaker */}
+                 <motion.g
+                   animate={{ y: [0, 1.5, 0] }}
+                   transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                 >
+                   <text x="50" y="65" textAnchor="middle" fill="white" fontSize="5.5" fontWeight="900"
+                     style={{ fontFamily: 'Inter Tight, sans-serif', letterSpacing: '0.15em', filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' }}>
+                     SOLVENT
+                   </text>
+                   <text x="50" y="71" textAnchor="middle" fill="black" fillOpacity="0.5" fontSize="1.8" fontWeight="900"
+                     style={{ fontFamily: 'Inter Tight, sans-serif', letterSpacing: '0.25em' }}>
+                     BY KAUSTIKSOLUTIONS
+                   </text>
+                 </motion.g>
+              </svg>
+           </motion.div>
         </div>
 
         {/* Bento Grid - Enhanced scaling */}

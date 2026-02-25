@@ -4,7 +4,6 @@ import { useAppStore } from '../store/useAppStore';
 
 const AuraBackground: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { auraMode } = useAppStore();
-  console.log('[DEBUG] AuraBackground Rendering, Mode:', auraMode);
 
   return (
     <div className="relative min-h-screen w-full bg-[#020205] overflow-hidden text-jb-text">
