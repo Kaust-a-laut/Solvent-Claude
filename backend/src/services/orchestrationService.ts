@@ -26,7 +26,7 @@ export interface MissionOptions {
 
 export interface MissionResult {
   goal: string;
-  expertOpinions: { agent: string; opinion: string }[];
+  expertOpinions: { id: string; agent: string; opinion: string }[];
   synthesis: string;
 }
 
@@ -140,7 +140,7 @@ export class OrchestrationService {
         [{ role: 'user', content: `GOAL: ${goal}\n\nAs the ${agent.name}, provide your professional analysis. ${agent.instruction}` }],
         { model: agentModel }
       );
-      return { agent: agent.name, opinion: response };
+      return { id: agent.id, agent: agent.name, opinion: response };
     }));
 
     // Phase 2: Anchored Synthesis Pass

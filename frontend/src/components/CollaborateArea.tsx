@@ -52,13 +52,19 @@ export const CollaborateArea = () => {
     ]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai/collaborate`, {
+      const response = await fetch(`${API_BASE_URL}/collaborate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ goal })
       });
       const data = await response.json();
-      setOpinions(data.opinions);
+      if (data.expertOpinions) {
+        setOpinions(data.expertOpinions.map((o: { id: string; opinion: string }) => ({
+          role: o.id as AgentOpinion['role'],
+          opinion: o.opinion,
+          status: 'completed' as const,
+        })));
+      }
     } catch (e) {
       console.error('Collaboration failed', e);
     } finally {

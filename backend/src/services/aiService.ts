@@ -262,7 +262,8 @@ export class AIService {
   async generateImage(prompt: string, model?: string, apiKey?: string, provider: string = 'auto', options: any = {}) {
     let targetProvider = provider;
     if (provider === 'auto') {
-      targetProvider = (config.HUGGINGFACE_API_KEY || options.apiKeys?.huggingface) ? 'huggingface' : 'gemini';
+      // Prefer pollinations (free, no key) unless a HF key is explicitly configured
+      targetProvider = (config.HUGGINGFACE_API_KEY || options.apiKeys?.huggingface) ? 'huggingface' : 'pollinations';
     }
 
     if (targetProvider === 'local') {
