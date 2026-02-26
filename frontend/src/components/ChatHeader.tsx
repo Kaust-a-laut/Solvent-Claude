@@ -65,7 +65,11 @@ export const ChatHeader = ({ compact }: ChatHeaderProps) => {
         <div className="flex flex-col">
           {!compact && <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.5em] mb-1.5 opacity-60">Mode</span>}
           <span className={cn("font-extrabold text-white uppercase tracking-[0.2em]", compact ? "text-[10px]" : "text-[12px]")}>
-            {currentMode === 'coding' ? 'Code' : currentMode === 'chat' ? 'Chat' : currentMode}
+            {({
+              chat: 'Chat', coding: 'Code', vision: 'Vision', browser: 'Browser',
+              model_playground: 'Playground', waterfall: 'Waterfall', debate: 'Debate',
+              compare: 'Compare', collaborate: 'Collaborate', home: 'Overview'
+            } as Record<string, string>)[currentMode] ?? currentMode}
           </span>
         </div>
         <div className={cn("bg-white/10", compact ? "h-4 w-[1px]" : "h-8 w-[1px]")} />

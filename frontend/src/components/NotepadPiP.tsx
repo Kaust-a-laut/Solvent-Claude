@@ -117,14 +117,8 @@ export const NotepadPiP = () => {
             </>
           )}
 
-          {!isToolView && view !== 'overseer' && (
-             <button onClick={() => setView('overseer')} className={cn("p-1.5 rounded-md transition-all", view === 'overseer' ? "text-emerald-400 bg-emerald-500/10" : "text-slate-600 hover:text-slate-400")} title="Assistant">
-                <Shield size={12} />
-             </button>
-          )}
-
           {view === 'overseer' && (
-             <button onClick={() => setView('dash')} className={cn("p-1.5 rounded-md transition-all", view === 'dash' ? "text-jb-purple bg-jb-purple/10" : "text-slate-600 hover:text-slate-400")} title="Tools">
+             <button onClick={() => setView('dash')} className="p-1.5 rounded-md transition-all text-slate-600 hover:text-slate-400" title="Tools">
                 <LayoutGrid size={12} />
              </button>
           )}

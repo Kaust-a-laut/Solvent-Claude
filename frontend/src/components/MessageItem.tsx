@@ -65,8 +65,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         <div className={cn(
           "rounded-xl flex items-center justify-center shadow-2xl border transition-all duration-500",
           compact ? "w-5 h-5" : "w-8 h-8",
-          isUser 
-            ? "bg-indigo-500/20 border-indigo-500/30 text-indigo-400" 
+          isUser
+            ? "bg-jb-accent/20 border-jb-accent/30 text-jb-accent"
             : "bg-black/60 border-white/10 text-slate-400 group-hover:border-jb-accent/40 group-hover:text-jb-accent"
         )}>
           {isUser ? <User size={compact ? 10 : 16} /> : <Bot size={compact ? 10 : 16} />}
@@ -94,7 +94,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
            "flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-500 mb-0.5",
            isUser && "justify-end"
         )}>
-          <span className={cn("transition-colors", isUser ? "text-indigo-400" : "text-slate-300 group-hover:text-white")}>
+          <span className={cn("transition-colors", isUser ? "text-jb-accent" : "text-slate-300 group-hover:text-white")}>
              {isUser ? 'Operator' : modelName}
           </span>
           <span className="opacity-40">{time}</span>
@@ -190,13 +190,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                  {/* Workspace Badge & HUD */}
                  {message.provenance.counts.workspace > 0 && (
                     <div className="group/hud relative">
-                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[9px] font-bold cursor-help">
+                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-400 text-[9px] font-bold cursor-help">
                           <Shield size={10} />
                           <span>{message.provenance.counts.workspace} WORKSPACE</span>
                        </div>
                        <div className="absolute bottom-full left-0 mb-2 w-64 hidden group-hover/hud:block z-50 animate-in fade-in slide-in-from-bottom-2">
-                          <div className="bg-black/90 border border-indigo-500/30 rounded-lg p-3 backdrop-blur-xl shadow-2xl">
-                             <div className="text-[8px] font-black text-indigo-400 uppercase tracking-tighter mb-2 border-b border-indigo-500/20 pb-1">Active File Context</div>
+                          <div className="bg-black/90 border border-white/10 rounded-lg p-3 backdrop-blur-xl shadow-2xl">
+                             <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-2 border-b border-white/10 pb-1">Active File Context</div>
                              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                                 {message.provenance.workspaceFiles.map((file: string, i: number) => (
                                    <div key={i} className="text-[10px] font-mono text-slate-300 truncate">/ {file}</div>

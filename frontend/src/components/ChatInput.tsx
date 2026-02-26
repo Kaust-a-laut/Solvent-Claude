@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Image as ImageIcon, Mic, MicOff, X, Loader2, Sparkles, Paperclip, FileText, ChevronUp, ChevronDown, Brain, Plus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -33,8 +33,16 @@ export const ChatInput = ({ compact = false }: ChatInputProps) => {
 
   const { isListening, transcript, startListening, stopListening, browserSupportsSpeechRecognition } = useSpeechToText();
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+  }, []);
 
   useEffect(() => {
     if (transcript) {
@@ -60,6 +68,7 @@ export const ChatInput = ({ compact = false }: ChatInputProps) => {
     setInput('');
     setSelectedImage(null);
     setAttachedFile(null);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const toggleListening = () => {
@@ -224,14 +233,15 @@ export const ChatInput = ({ compact = false }: ChatInputProps) => {
             </div>
 
             <div className="flex-1 relative mx-2">
-              <textarea 
+              <textarea
+                ref={textareaRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); adjustHeight(); }}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
                 placeholder="Message Solvent..."
                 className={cn(
-                  "w-full bg-transparent border-none outline-none font-sans font-bold text-white placeholder:text-slate-800 resize-none scrollbar-hide",
-                  compact ? "text-xs py-2 h-[34px]" : (deviceInfo.isMobile ? "text-xs py-3 h-[42px]" : "text-[14px] py-3 h-[42px]")
+                  "w-full bg-transparent border-none outline-none font-sans font-bold text-white placeholder:text-slate-800 resize-none scrollbar-hide overflow-y-auto",
+                  compact ? "text-xs py-2 min-h-[34px] max-h-[120px]" : (deviceInfo.isMobile ? "text-xs py-3 min-h-[42px] max-h-[120px]" : "text-[14px] py-3 min-h-[42px] max-h-[160px]")
                 )}
                 rows={1}
               />
@@ -255,7 +265,7 @@ export const ChatInput = ({ compact = false }: ChatInputProps) => {
                 onClick={handleSend}
                 disabled={(!input.trim() && !selectedImage && !attachedFile) || isProcessing}
                 className={cn(
-                  "bg-black/40 border border-white/5 rounded-2xl flex items-center justify-center disabled:opacity-20 transition-all shadow-2xl button-glow-hover font-black uppercase tracking-widest",
+                  "bg-black/40 border border-white/5 rounded-2xl flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xl button-glow-hover font-black uppercase tracking-widest",
                   compact ? "w-8 h-8" : (deviceInfo.isMobile ? "w-10 h-10" : "px-6 h-11"),
                   compact ? "text-[8px]" : "text-[10px]",
                   "text-jb-accent hover:text-white hover:border-jb-accent/50"

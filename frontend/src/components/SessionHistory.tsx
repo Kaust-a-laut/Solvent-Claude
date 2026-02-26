@@ -12,13 +12,15 @@ export const SessionHistory = () => {
   const [isOpen, setIsOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock sessions for now since we need a way to create them in store
-  // In a real app, these would come from state.sessions
-  const sessionList = Object.keys(sessions).map(id => ({
+  const allSessions = Object.keys(sessions).map(id => ({
     id,
     title: sessions[id][0]?.content.slice(0, 30) || 'New Conversation',
     time: '2h ago'
   }));
+
+  const sessionList = searchTerm.trim()
+    ? allSessions.filter(s => s.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    : allSessions;
 
   const createNewSession = () => {
     // Logic to clear current messages and start fresh
