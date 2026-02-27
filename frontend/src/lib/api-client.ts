@@ -3,12 +3,19 @@ export interface RequestOptions extends RequestInit {
   backoff?: number;
 }
 
+export interface ApiErrorResponse {
+  error?: string;
+  message?: string;
+  status?: number;
+  [key: string]: unknown;
+}
+
 export class APIError extends Error {
   constructor(
     public message: string,
     public status?: number,
     public statusText?: string,
-    public body?: any
+    public body?: ApiErrorResponse | string
   ) {
     super(message);
     this.name = 'APIError';
@@ -17,24 +24,42 @@ export class APIError extends Error {
 
 let cachedSecret: string | null = null;
 
-async function getSecret() {
+/**
+ * Retrieves the session secret for authenticating with the backend.
+ * 
+ * In Electron mode, this is provided by the Electron preload script.
+ * In pure web mode (without Electron), authentication is unavailable and
+ * the backend will reject requests - this mode is not supported.
+ * 
+ * @throws {Error} When running in pure web mode without Electron support
+ */
+async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
+  
   if (window.electron?.getSessionSecret) {
     cachedSecret = await window.electron.getSessionSecret();
     return cachedSecret;
   }
-  return 'solvent_default_secure_pass_2026'; // Fallback for pure web dev mode
+  
+  // Pure web mode without Electron is not supported for security reasons
+  throw new Error(
+    'Authentication unavailable: Solvent requires the Electron environment. ' +
+    'Pure web mode is not supported without a secure authentication mechanism.'
+  );
 }
 
-export async function fetchWithRetry(url: string, options: RequestOptions = {}): Promise<any> {
+export async function fetchWithRetry(
+  url: string,
+  options: RequestOptions = {}
+): Promise<unknown> {
   const { retries = 3, backoff = 1000, ...fetchOptions } = options;
   const secret = await getSecret();
-  
+
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const headers: any = {
+      const headers: Record<string, string> = {
         ...options.headers,
         'X-Solvent-Secret': secret
       };
@@ -45,15 +70,15 @@ export async function fetchWithRetry(url: string, options: RequestOptions = {}):
       }
 
       const response = await fetch(url, { ...fetchOptions, headers });
-      
+
       if (!response.ok) {
-        let errorBody;
+        let errorBody: ApiErrorResponse | string;
         try {
           errorBody = await response.json();
         } catch {
           errorBody = await response.text();
         }
-        
+
         const error = new APIError(
           `Request failed with status ${response.status}`,
           response.status,
@@ -65,19 +90,19 @@ export async function fetchWithRetry(url: string, options: RequestOptions = {}):
         if (response.status >= 400 && response.status < 500) {
           throw error;
         }
-        
+
         throw error;
       }
-      
+
       return await response.json();
-    } catch (err: any) {
-      lastError = err;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
       console.error(`[API] Attempt ${attempt + 1} failed:`, {
-        message: err.message,
-        status: err.status,
-        body: err.body
+        message: lastError.message,
+        status: (lastError as APIError).status,
+        body: (lastError as APIError).body
       });
-      
+
       if (attempt < retries - 1) {
         const delay = backoff * Math.pow(2, attempt);
         console.log(`[API] Retrying in ${delay}ms...`);
@@ -85,6 +110,6 @@ export async function fetchWithRetry(url: string, options: RequestOptions = {}):
       }
     }
   }
-  
+
   throw lastError;
 }

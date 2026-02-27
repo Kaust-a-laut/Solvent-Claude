@@ -14,24 +14,35 @@ export interface CompletionOptions {
   signal?: AbortSignal;
 }
 
+export interface ImageContent {
+  data: string;
+  mimeType: string;
+}
+
+export interface SearchResult {
+  title: string;
+  link: string;
+  snippet?: string;
+}
+
 export interface IAIProvider {
   name: string;
   defaultModel?: string;
-  initialize?(options: Record<string, any>): Promise<void>;
-  
+  initialize?(options: Record<string, unknown>): Promise<void>;
+
   generateChatCompletion(
-    messages: ChatMessage[], 
+    messages: ChatMessage[],
     options: CompletionOptions
   ): Promise<string>;
-  
+
   generateChatStream?(
-    messages: ChatMessage[], 
+    messages: ChatMessage[],
     options: CompletionOptions
   ): AsyncGenerator<string>;
 
   generateVisionContent?(
     prompt: string,
-    images: { data: string; mimeType: string }[],
+    images: ImageContent[],
     options?: CompletionOptions
   ): Promise<string>;
 }
@@ -43,7 +54,7 @@ export interface ChatRequestData {
   provider: string;
   model: string;
   messages: ChatMessage[];
-  image?: any;
+  image?: ImageContent | null;
   mode?: string;
   smartRouter?: boolean;
   fallbackModel?: string;
@@ -63,6 +74,6 @@ export interface ChatRequestData {
   codingHistory?: ChatMessage[];
   browserContext?: {
     history: string[];
-    lastSearchResults?: any;
+    lastSearchResults?: SearchResult[];
   };
 }

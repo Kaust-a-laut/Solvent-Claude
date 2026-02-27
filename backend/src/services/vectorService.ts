@@ -17,13 +17,19 @@ interface VectorEntry {
 
 export type MemoryTier = 'episodic' | 'crystallized' | 'meta-summary' | 'archived';
 
+interface CachedEmbedding {
+  vector: number[];
+  lastAccess: number;
+  dirty: boolean; // Flag for efficient persistence
+}
+
 export class VectorService {
   private genAI: GoogleGenerativeAI | null = null;
   private dbPath: string;
   private embeddingCachePath: string;
   private memory: VectorEntry[] = [];
   private isIndexing: boolean = false;
-  private embeddingCache: Map<string, { vector: number[], lastAccess: number }> = new Map();
+  private embeddingCache: Map<string, CachedEmbedding> = new Map();
   private embeddingCacheLoaded: Promise<void>;
   private newEntriesSinceLastDream: number = 0;
   private readonly SATURATION_THRESHOLD = 200;
@@ -35,7 +41,10 @@ export class VectorService {
   private useHNSW: boolean = true;
   private saveCounter: number = 0;
   private readonly BACKUP_INTERVAL = 50;
-
+  
+  // LRU Cache Configuration
+  private readonly MAX_CACHE_SIZE = config.MEMORY_CACHE_SIZE;
+  
   // Secondary Indices
   public typeIndex: Map<string, Set<string>> = new Map();
   public tagIndex: Map<string, Set<string>> = new Map();
@@ -157,9 +166,11 @@ export class VectorService {
       for (const entry of parsed) {
         // Validate each entry has required fields
         if (entry && typeof entry.text === 'string' && Array.isArray(entry.vector)) {
+          // Mark loaded entries as clean (not dirty) since they match disk state
           this.embeddingCache.set(entry.text, {
             vector: entry.vector,
-            lastAccess: entry.lastAccess || Date.now()
+            lastAccess: entry.lastAccess || Date.now(),
+            dirty: false
           });
           loadedCount++;
         }
@@ -178,13 +189,28 @@ export class VectorService {
 
   async persistEmbeddingCache() {
     try {
-      const entries = Array.from(this.embeddingCache.entries()).map(([text, { vector, lastAccess }]) => ({
-        text,
-        vector,
-        lastAccess
-      }));
-      await AtomicFileSystem.writeJson(this.embeddingCachePath, entries);
-      logger.info(`[VectorService] Persisted ${entries.length} embeddings to cache file.`);
+      // Dirty-flag approach: Only persist entries that have been modified since last persist
+      const dirtyEntries = Array.from(this.embeddingCache.entries())
+        .filter(([_, data]) => data.dirty)
+        .map(([text, { vector, lastAccess }]) => ({
+          text,
+          vector,
+          lastAccess
+        }));
+      
+      if (dirtyEntries.length === 0) {
+        logger.debug('[VectorService] No dirty entries to persist.');
+        return;
+      }
+      
+      await AtomicFileSystem.writeJson(this.embeddingCachePath, dirtyEntries);
+      logger.info(`[VectorService] Persisted ${dirtyEntries.length} dirty embeddings to cache file.`);
+      
+      // Mark all entries as clean after successful persist
+      for (const [text] of this.embeddingCache.entries()) {
+        const entry = this.embeddingCache.get(text);
+        if (entry) entry.dirty = false;
+      }
     } catch (error) {
       logger.error('[VectorService] Failed to persist embedding cache', error);
     }
@@ -368,10 +394,15 @@ export class VectorService {
     if (!text || text.trim().length === 0) return new Array(768).fill(0);
 
     const cached = this.embeddingCache.get(text);
-    if (cached) {
+    if (cached?.vector) {
       cached.lastAccess = Date.now();
       memoryMetrics.recordCacheHit();
       return cached.vector;
+    }
+    
+    // Handle case where cache entry exists but vector is missing
+    if (cached) {
+      this.embeddingCache.delete(text);
     }
 
     try {
@@ -379,10 +410,10 @@ export class VectorService {
       const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
       const result = await model.embedContent(text);
       const values = result.embedding.values;
-      
+
       memoryMetrics.recordCacheMiss();
       this.cacheEmbedding(text, values);
-      
+
       return values;
     } catch (err) {
       logger.error('Embedding generation failed:', err);
@@ -441,9 +472,8 @@ export class VectorService {
   }
 
   private cacheEmbedding(text: string, vector: number[]) {
-    const MAX_CACHE = config.MEMORY_CACHE_SIZE;
-    if (this.embeddingCache.size >= MAX_CACHE) {
-      // LRU Eviction
+    // LRU Eviction: Remove least recently accessed entry when at capacity
+    if (this.embeddingCache.size >= this.MAX_CACHE_SIZE) {
       let oldestKey: string | null = null;
       let oldestTime = Infinity;
       for (const [key, val] of this.embeddingCache.entries()) {
@@ -452,12 +482,16 @@ export class VectorService {
           oldestKey = key;
         }
       }
-      if (oldestKey) this.embeddingCache.delete(oldestKey);
+      if (oldestKey) {
+        this.embeddingCache.delete(oldestKey);
+        logger.debug(`[VectorService] LRU eviction: ${oldestKey}`);
+      }
     }
-    this.embeddingCache.set(text, { vector, lastAccess: Date.now() });
+    
+    this.embeddingCache.set(text, { vector, lastAccess: Date.now(), dirty: true });
     memoryMetrics.updateCacheSize(this.embeddingCache.size);
 
-    // Periodic persistence
+    // Periodic persistence using dirty-flag approach
     this.cacheWriteCounter++;
     if (this.cacheWriteCounter >= this.CACHE_PERSIST_THRESHOLD) {
       this.cacheWriteCounter = 0;
@@ -1136,7 +1170,10 @@ export class VectorService {
   }
 
   getEntriesByIds(ids: string[]) {
-    return this.memory.filter(m => ids.includes(m.id));
+    // Filter to only return entries that exist and filter out any undefined results
+    return this.memory
+      .filter((m): m is VectorEntry => m !== undefined && ids.includes(m.id))
+      .filter(Boolean);
   }
 
   getMemoryInternal() {

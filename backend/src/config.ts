@@ -5,6 +5,8 @@ import path from 'path';
 // Load .env from project root
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), override: true });
 
+const OLD_INSECURE_DEFAULT = 'solvent_dev_insecure_default';
+
 const envSchema = z.object({
   PORT: z.string().transform(Number).default('3001'),
   GEMINI_API_KEY: z.string().optional(),
@@ -19,8 +21,12 @@ const envSchema = z.object({
   OLLAMA_HOST: z.string().default('http://127.0.0.1:11434'),
   // Feature flags
   ENABLE_OLLAMA: z.string().transform(v => v === 'true').default('true'),
-  // Security
-  BACKEND_INTERNAL_SECRET: z.string().default('solvent_dev_insecure_default'),
+  // Security - REQUIRED, no default, must be at least 32 characters
+  BACKEND_INTERNAL_SECRET: z.string().min(32, 'BACKEND_INTERNAL_SECRET must be at least 32 characters for security'),
+  // CORS Configuration
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  // AI Provider Timeout (milliseconds)
+  AI_PROVIDER_TIMEOUT_MS: z.string().transform(Number).default('120000'),
   // Memory System
   MEMORY_CACHE_SIZE: z.string().transform(Number).default('1000'),
   MEMORY_MAX_ENTRIES: z.string().transform(Number).default('1500'),
@@ -34,6 +40,21 @@ if (!parsedEnv.success) {
 }
 
 export const config = parsedEnv.data;
+
+// Security validation: Ensure the secret is not the old insecure default
+if (config.BACKEND_INTERNAL_SECRET === OLD_INSECURE_DEFAULT) {
+  console.error('❌ SECURITY ERROR: BACKEND_INTERNAL_SECRET is set to the insecure default value.');
+  console.error('   You MUST set a strong, unique secret in your .env file.');
+  console.error('   Example: BACKEND_INTERNAL_SECRET=$(openssl rand -hex 32)');
+  console.error('   Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  process.exit(1);
+}
+
+// Validate secret strength (must contain mix of characters)
+if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{32,}$/.test(config.BACKEND_INTERNAL_SECRET)) {
+  console.warn('⚠️  WARNING: BACKEND_INTERNAL_SECRET may be weak. It should contain uppercase, lowercase, and numbers.');
+  console.warn('   Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+}
 
 export const APP_CONSTANTS = {
   WATERFALL: {
