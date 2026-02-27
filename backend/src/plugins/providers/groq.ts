@@ -15,8 +15,40 @@ export class GroqProviderPlugin implements IProviderPlugin {
     supportsEmbeddings: false,
     contextWindow: 128000,
     maxOutputTokens: 8192,
-    supportsFunctionCalling: true
+    supportsFunctionCalling: true,
+    costPer1k: { input: 0.05, output: 0.08 } // Prices in USD per 1000 tokens
   };
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      if (!this.apiKey) return false;
+
+      // Perform a minimal API call to check health
+      const response = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+      });
+      return response.ok;
+    } catch (error) {
+      console.error(`[Groq] Health check failed:`, error);
+      return false;
+    }
+  }
+
+  async getHealth(): Promise<import('../../types/plugins').ProviderHealth> {
+    const startTime = Date.now();
+    const isHealthy = await this.healthCheck();
+    const latency = Date.now() - startTime;
+
+    // In a real implementation, we'd track error rates over time
+    const errorRate = 0; // Placeholder
+
+    return {
+      isHealthy,
+      lastChecked: Date.now(),
+      latency,
+      errorRate
+    };
+  }
 
   private isInitialized = false;
   private apiKey: string | null = null;

@@ -15,8 +15,39 @@ export class GeminiProviderPlugin implements IProviderPlugin {
     supportsEmbeddings: true,
     contextWindow: 1000000,  // Gemini 1.5 Pro
     maxOutputTokens: 8192,
-    supportsFunctionCalling: true
+    supportsFunctionCalling: true,
+    costPer1k: { input: 0.075, output: 0.30 } // Prices in USD per 1000 tokens
   };
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      if (!this.genAI) return false;
+
+      // Perform a minimal API call to check health
+      const model = this.genAI.getGenerativeModel({ model: this.defaultModel || 'gemini-1.5-flash' });
+      const result = await model.generateContent('Hello');
+      return !!result.response.text();
+    } catch (error) {
+      console.error(`[Gemini] Health check failed:`, error);
+      return false;
+    }
+  }
+
+  async getHealth(): Promise<import('../../types/plugins').ProviderHealth> {
+    const startTime = Date.now();
+    const isHealthy = await this.healthCheck();
+    const latency = Date.now() - startTime;
+
+    // In a real implementation, we'd track error rates over time
+    const errorRate = 0; // Placeholder
+
+    return {
+      isHealthy,
+      lastChecked: Date.now(),
+      latency,
+      errorRate
+    };
+  }
 
   private genAI: GoogleGenerativeAI | null = null;
   private isInitialized = false;

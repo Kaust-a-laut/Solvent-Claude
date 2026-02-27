@@ -63,12 +63,30 @@ describe('PluginManager.resolveProvider', () => {
   });
 
   it('should filter by capabilities when specified', async () => {
-    const gemini = new MockProvider('gemini', 'Gemini', true, { supportsVision: true });
-    const groq = new MockProvider('groq', 'Groq', true, { supportsVision: false });
+    const gemini = new MockProvider('gemini', 'Gemini', true, {
+      supportsVision: true,
+      contextWindow: 1000000,
+      supportsFunctionCalling: true,
+      supportsStreaming: true,
+      costPer1k: { input: 0.075, output: 0.30 }
+    });
+    const groq = new MockProvider('groq', 'Groq', true, {
+      supportsVision: false,
+      contextWindow: 128000,
+      supportsFunctionCalling: true,
+      supportsStreaming: true,
+      costPer1k: { input: 0.05, output: 0.08 }
+    });
     await manager.registerProvider(gemini);
     await manager.registerProvider(groq);
 
-    const resolved = await manager.resolveProvider(undefined, undefined, { supportsVision: true });
+    const resolved = await manager.resolveProvider(undefined, undefined, {
+      supportsVision: true,
+      contextWindow: 1000,
+      supportsFunctionCalling: false,
+      supportsStreaming: true,
+      costPer1k: { input: 0, output: 0 }
+    });
     expect(resolved.id).toBe('gemini');
   });
 });

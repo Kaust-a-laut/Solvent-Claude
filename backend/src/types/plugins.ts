@@ -21,18 +21,26 @@ export interface IPlugin {
 }
 
 export interface ProviderCapabilities {
-  /** Supports vision/image input */
-  supportsVision?: boolean;
-  /** Supports streaming responses */
-  supportsStreaming?: boolean;
-  /** Supports embedding generation */
-  supportsEmbeddings?: boolean;
   /** Maximum context window in tokens */
-  contextWindow?: number;
-  /** Maximum output tokens */
-  maxOutputTokens?: number;
+  contextWindow: number;
+  /** Supports vision/image input */
+  supportsVision: boolean;
   /** Supports function/tool calling */
-  supportsFunctionCalling?: boolean;
+  supportsFunctionCalling: boolean;
+  /** Supports streaming responses */
+  supportsStreaming: boolean;
+  /** Cost per 1000 tokens */
+  costPer1k: {
+    input: number;
+    output: number;
+  };
+}
+
+export interface ProviderHealth {
+  isHealthy: boolean;
+  lastChecked: number;
+  latency: number;
+  errorRate: number;
 }
 
 export interface IProviderPlugin extends IPlugin {
@@ -41,6 +49,12 @@ export interface IProviderPlugin extends IPlugin {
 
   /** Provider capabilities */
   capabilities?: ProviderCapabilities;
+
+  /** Get current health status */
+  getHealth?(): Promise<ProviderHealth>;
+
+  /** Perform health check */
+  healthCheck?(): Promise<boolean>;
 
   /** Generate a completion */
   complete(

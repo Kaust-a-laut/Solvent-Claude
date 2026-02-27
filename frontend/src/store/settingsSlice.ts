@@ -2,6 +2,14 @@ import { StateCreator } from 'zustand';
 import { AppState, DeviceInfo } from './types';
 import { APP_CONFIG } from '../lib/config';
 
+export interface ProviderConfig {
+  apiKey?: string;
+  baseUrl?: string;
+  defaultModel?: string;
+  enabled: boolean;
+  priority?: number;
+}
+
 export interface SettingsSlice {
   backend: 'gemini' | 'ollama' | 'deepseek' | 'openrouter' | 'groq';
   currentMode: string;
@@ -31,6 +39,8 @@ export interface SettingsSlice {
   browserHistory: string[];
   lastSearchResults: any | null;
   activities: any[];
+  availableProviders: any[];
+  providerConfigs: Record<string, ProviderConfig>;
 
   setBackend: (backend: any) => void;
   setCurrentMode: (mode: string) => void;
@@ -61,6 +71,9 @@ export interface SettingsSlice {
   setBrowserHistory: (history: string[]) => void;
   setLastSearchResults: (results: any) => void;
   addActivity: (activity: any) => void;
+  setAvailableProviders: (providers: any[]) => void;
+  setProviderConfigs: (configs: Record<string, ProviderConfig>) => void;
+  updateProviderConfig: (providerId: string, config: Partial<ProviderConfig>) => void;
 }
 
 export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> = (set) => ({
@@ -100,6 +113,8 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
   browserHistory: [],
   lastSearchResults: null,
   activities: [],
+  availableProviders: [],
+  providerConfigs: {},
 
   setBackend: (backend) => set({ backend }),
   setCurrentMode: (currentMode) => set((state: any) => ({
@@ -139,4 +154,15 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
   addActivity: (activity) => set((state) => ({
     activities: [activity, ...state.activities].slice(0, 50)
       })),
+  setAvailableProviders: (availableProviders) => set({ availableProviders }),
+  setProviderConfigs: (providerConfigs) => set({ providerConfigs }),
+  updateProviderConfig: (providerId, config) => set((state) => ({
+    providerConfigs: {
+      ...state.providerConfigs,
+      [providerId]: {
+        ...(state.providerConfigs[providerId] || {}),
+        ...config
+      }
+    }
+  })),
 });

@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, lazy } from 'react';
+import React, { Suspense, useEffect, lazy, useState, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useDevice } from '../hooks/useDevice';
 import AuraBackground from './AuraBackground';
@@ -10,6 +10,9 @@ import { X, Network, Loader2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TitleBar } from './TitleBar';
 import { SettingsModal } from './SettingsModal';
+import { SupervisorHistory } from './SupervisorHistory';
+import { KnowledgeMapMini } from './KnowledgeMapMini';
+import { cn } from '../lib/utils';
 
 // Lazy load feature areas to slim down the main bundle
 const DebateArea = lazy(() => import('./DebateArea').then(m => ({ default: m.DebateArea })));
@@ -31,9 +34,37 @@ const LoadingFallback = () => (
 );
 
 export const ChatArea = () => {
-  const { currentMode, setCurrentMode, setDeviceInfo, deviceInfo, setSupervisorInsight, supervisorInsight, addActivity } = useAppStore();
+  const { currentMode, setCurrentMode, setDeviceInfo, deviceInfo, setSupervisorInsight, supervisorInsight, addActivity, graphNodes, isProcessing } = useAppStore();
   const device = useDevice();
-  const [clarificationRequest, setClarificationRequest] = React.useState<any>(null);
+  const [clarificationRequest, setClarificationRequest] = useState<any>(null);
+
+  // Graph pulse effect - track when new nodes are added
+  const prevNodeCount = useRef(graphNodes.length);
+  const [graphPulse, setGraphPulse] = useState(false);
+  const [newNodeCount, setNewNodeCount] = useState(0);
+
+  useEffect(() => {
+    if (graphNodes.length > prevNodeCount.current) {
+      const diff = graphNodes.length - prevNodeCount.current;
+      setNewNodeCount(diff);
+      setGraphPulse(true);
+
+      // Add activity for new nodes
+      addActivity({
+        id: `graph-update-${Date.now()}`,
+        type: 'graph',
+        message: `Knowledge graph expanded: +${diff} node${diff > 1 ? 's' : ''}`,
+        timestamp: new Date().toISOString(),
+        source: 'system'
+      });
+
+      setTimeout(() => {
+        setGraphPulse(false);
+        setNewNodeCount(0);
+      }, 2000);
+    }
+    prevNodeCount.current = graphNodes.length;
+  }, [graphNodes.length, addActivity]);
 
   useEffect(() => {
     socket.on('SUPERVISOR_CLARIFICATION', (req) => {
@@ -128,29 +159,38 @@ export const ChatArea = () => {
           </AnimatePresence>
   
           <div className="flex-1 flex h-full overflow-hidden relative">
-             <div className="flex-1 h-full flex flex-col border-r border-white/5 relative z-10 min-w-0 overflow-hidden">
+             <div className={cn(
+               "flex-1 h-full flex flex-col border-r border-white/5 relative z-10 min-w-0 overflow-hidden transition-all duration-500",
+               graphPulse && "ring-2 ring-jb-purple/20 ring-inset",
+               isProcessing && "intelligence-active"
+             )}>
+                {/* Graph Update Pulse Indicator */}
+                <AnimatePresence>
+                  {graphPulse && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-jb-purple/20 border border-jb-purple/30 rounded-full backdrop-blur-sm shadow-lg"
+                    >
+                      <div className="relative">
+                        <div className="w-2 h-2 rounded-full bg-jb-purple" />
+                        <div className="absolute inset-0 w-2 h-2 rounded-full bg-jb-purple animate-ping" />
+                      </div>
+                      <span className="text-[10px] font-black text-jb-purple uppercase tracking-widest">
+                        +{newNodeCount} Node{newNodeCount > 1 ? 's' : ''}
+                      </span>
+                      <Network size={12} className="text-jb-purple" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <Suspense fallback={<LoadingFallback />}>
                    {renderContent()}
                 </Suspense>
                 
                 <AnimatePresence>
-                  {supervisorInsight && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 50, x: "-50%" }}
-                      animate={{ opacity: 1, y: 0, x: "-50%" }}
-                      exit={{ opacity: 0, y: 20, x: "-50%" }}
-                      className="absolute bottom-8 left-1/2 z-50 bg-jb-purple/10 border border-jb-purple/20 backdrop-blur-xl px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 max-w-lg"
-                    >
-                       <div className="w-8 h-8 rounded-full bg-jb-purple/20 flex items-center justify-center shrink-0">
-                          <Network size={16} className="text-jb-purple" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-jb-purple mb-1">Supervisor Insight</p>
-                          <p className="text-xs text-white font-medium">{supervisorInsight}</p>
-                       </div>
-                       <button onClick={() => setSupervisorInsight(null)} className="ml-2 text-slate-400 hover:text-white"><X size={14} /></button>
-                    </motion.div>
-                  )}
+                  {/* Old supervisor toast removed - now using SupervisorHistory component */}
                   
                   {clarificationRequest && (
                     <motion.div 
@@ -190,6 +230,12 @@ export const ChatArea = () => {
         </div>
       </div>
       <FloatingNotepad />
+
+      {/* Persistent Supervisor History Panel */}
+      <SupervisorHistory />
+
+      {/* Knowledge Map Mini Preview */}
+      <KnowledgeMapMini />
     </AuraBackground>
   );
 };

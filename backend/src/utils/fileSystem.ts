@@ -1,6 +1,17 @@
-import fs from 'fs/promises';
-import path from 'path';
+import * as path from 'path';
+import * as fs from 'fs/promises';
 import { logger } from './logger';
+
+// Single source of truth for project root - resolves from this file's location
+export const PROJECT_ROOT = path.resolve(__dirname, '../../../');
+
+export const validatePath = (targetPath: string) => {
+  const normalized = path.resolve(PROJECT_ROOT, targetPath);
+  if (!normalized.startsWith(PROJECT_ROOT)) {
+    throw new Error(`SECURITY ALERT: Path escape detected: ${targetPath}`);
+  }
+  return normalized;
+};
 
 export class AtomicFileSystem {
   /**

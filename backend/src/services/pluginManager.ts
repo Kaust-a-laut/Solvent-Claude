@@ -223,9 +223,9 @@ export class PluginManager {
 
   /**
    * Resolve the best available provider using 3-tier fallback:
-   * 1. Explicit request (if provided and ready)
-   * 2. Default provider from config (if ready)
-   * 3. First available ready provider
+   * 1. Explicit request (if provided, ready, and circuit closed)
+   * 2. Default provider from config (if ready and circuit closed)
+   * 3. First available ready provider with closed circuit
    *
    * @param requested - Explicitly requested provider ID
    * @param defaultProvider - Default provider ID (falls back to config.DEFAULT_PROVIDER)
@@ -237,15 +237,17 @@ export class PluginManager {
     requiredCapabilities?: Partial<ProviderCapabilities>
   ): Promise<IProviderPlugin> {
     const { config } = await import('../config');
+    const { circuitBreaker } = await import('./circuitBreaker');
     const effectiveDefault = defaultProvider || config.DEFAULT_PROVIDER;
 
     // Helper to check if provider meets capability requirements
     const meetsCapabilities = (provider: IProviderPlugin): boolean => {
       if (!requiredCapabilities) return true;
-      const caps = provider.capabilities || {};
+      const caps = provider.capabilities;
+      if (!caps) return false; // If provider has no capabilities, it can't meet requirements
 
       for (const [key, value] of Object.entries(requiredCapabilities)) {
-        const capValue = caps[key as keyof ProviderCapabilities];
+        const capValue = (caps as any)[key as keyof ProviderCapabilities];
         if (value === true && !capValue) {
           return false;
         }
@@ -256,34 +258,51 @@ export class PluginManager {
       return true;
     };
 
-    // 1. Try explicitly requested provider
+    // Helper to check if provider is available (ready and circuit not open)
+    const isAvailable = (providerId: string): boolean => {
+      const provider = this.registry.providers.get(providerId);
+      if (!provider || !provider.isReady()) return false;
+      // We'll check circuit state in the actual resolution
+      return true;
+    };
+
+    // 1. Try explicitly requested provider (if circuit allows)
     if (requested) {
-      const plugin = this.registry.providers.get(requested);
-      if (plugin && plugin.isReady() && meetsCapabilities(plugin)) {
-        logger.debug(`[PluginManager] Resolved explicit provider: ${requested}`);
-        return plugin;
+      if (isAvailable(requested) && meetsCapabilities(this.registry.providers.get(requested)!)) {
+        if (!(await circuitBreaker.isOpen(requested))) {
+          logger.debug(`[PluginManager] Resolved explicit provider: ${requested}`);
+          return this.registry.providers.get(requested)!;
+        } else {
+          logger.warn(`[PluginManager] Circuit breaker open for requested provider: ${requested}`);
+        }
+      } else {
+        logger.warn(`[PluginManager] Requested provider ${requested} not ready or missing capabilities`);
       }
-      logger.warn(`[PluginManager] Requested provider ${requested} not ready or missing capabilities`);
     }
 
-    // 2. Try default provider
+    // 2. Try default provider (if circuit allows)
     if (effectiveDefault) {
-      const plugin = this.registry.providers.get(effectiveDefault);
-      if (plugin && plugin.isReady() && meetsCapabilities(plugin)) {
-        logger.debug(`[PluginManager] Resolved default provider: ${effectiveDefault}`);
-        return plugin;
+      if (isAvailable(effectiveDefault) && meetsCapabilities(this.registry.providers.get(effectiveDefault)!)) {
+        if (!(await circuitBreaker.isOpen(effectiveDefault))) {
+          logger.debug(`[PluginManager] Resolved default provider: ${effectiveDefault}`);
+          return this.registry.providers.get(effectiveDefault)!;
+        } else {
+          logger.warn(`[PluginManager] Circuit breaker open for default provider: ${effectiveDefault}`);
+        }
       }
     }
 
-    // 3. Find first ready provider that meets capabilities
+    // 3. Find first ready provider that meets capabilities and has closed circuit
     for (const provider of this.registry.providers.values()) {
-      if (provider.isReady() && meetsCapabilities(provider)) {
+      if (provider.isReady() &&
+          meetsCapabilities(provider) &&
+          !(await circuitBreaker.isOpen(provider.id))) {
         logger.info(`[PluginManager] Resolved fallback provider: ${provider.id}`);
         return provider;
       }
     }
 
-    throw new Error('No operational AI providers found in the plugin system.');
+    throw new Error('No operational AI providers found in the plugin system. All available providers are either unhealthy or circuit is open.');
   }
 
   async reload(): Promise<void> {

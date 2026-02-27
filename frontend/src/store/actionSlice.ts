@@ -115,10 +115,10 @@ export const createActionSlice: StateCreator<AppState, [], [], ActionSlice> = (s
       }
     } catch (error: any) {
       const errorMessage = error.body?.error || error.message || 'Service unavailable.';
-      state.addMessage({ 
-        role: 'assistant', 
+      state.addMessage({
+        role: 'assistant',
         content: `Error: ${errorMessage}`,
-        model: state.imageProvider === 'huggingface' ? 'Hugging Face' : 'System'
+        model: 'System'
       });
     } finally {
       state.setIsProcessing(false);
@@ -147,10 +147,10 @@ export const createActionSlice: StateCreator<AppState, [], [], ActionSlice> = (s
       });
     } catch (error: any) {
       const errorMessage = error.body?.error || error.message || 'Image generation failed.';
-      state.addMessage({ 
-        role: 'assistant', 
+      state.addMessage({
+        role: 'assistant',
         content: `Error: ${errorMessage}`,
-        model: state.imageProvider === 'huggingface' ? 'Hugging Face' : 'System'
+        model: 'Image Generator'
       });
     } finally {
       state.setIsProcessing(false);

@@ -3,9 +3,11 @@ import path from 'path';
 import { spawn } from 'child_process';
 import axios from 'axios';
 import { vectorService } from './vectorService';
+import { logger } from '../utils/logger';
 import screenshot from 'screenshot-desktop';
 import sharp from 'sharp';
-import { logger } from '../utils/logger';
+import { validatePath, PROJECT_ROOT } from '../utils/fileSystem';
+import { transactionService } from './transactionService';
 
 // Security: Explicit allowlist of permitted command prefixes
 // This replaces the insecure denylist approach which was trivially bypassed
@@ -63,46 +65,99 @@ const DANGEROUS_COMMANDS = [
 ];
 
 export class ToolService {
-  private rootDir: string;
+  private isDryRun = process.env.DRY_RUN === 'true';
 
   constructor() {
-    this.rootDir = path.resolve(__dirname, '../../../');
+    // Uses PROJECT_ROOT from fileSystem.ts directly
   }
 
   async executeTool(toolName: string, args: any) {
-    console.log(`[ToolService] Executing ${toolName}...`, args);
+    const txId = await transactionService.logStart(toolName, args);
+    logger.info(`[ToolService] Executing ${toolName}... (TX: ${txId})`, args);
     
-    switch (toolName) {
-      case 'read_file':
-        return await this.readFile(args.path);
-      case 'write_file':
-        return await this.writeFile(args.path, args.content);
-      case 'list_files':
-        return await this.listFiles(args.path || '.');
-      case 'run_shell':
-        return await this.runShell(args.command);
-      case 'web_search':
-        return await this.webSearch(args.query);
-      case 'fetch_web_content':
-        return await this.fetchWebContent(args.url);
-      case 'capture_ui':
-        return await this.captureUI();
-      case 'get_ui_text':
-        return await this.getUIText();
-      case 'resize_image':
-        return await this.resizeImage(args.path, args.width, args.height);
-      case 'crop_image':
-        return await this.cropImage(args.path, args.left, args.top, args.width, args.height);
-      case 'apply_image_filter':
-        return await this.applyImageFilter(args.path, args.filter);
-      case 'get_image_info':
-        return await this.getImageInfo(args.path);
-      case 'crystallize_memory':
-        return await this.crystallizeMemory(args.content, args.type, args.tags);
-      case 'invalidate_memory':
-        return await this.invalidateMemory(args.memoryId, args.reason, args.replacementId);
-      default:
-        throw new Error(`Unknown tool: ${toolName}`);
+    // GUARD: Budget Enforcement
+    const { supervisorService } = require('./supervisorService');
+    try {
+      supervisorService.incrementToolBudget();
+    } catch (e: any) {
+      await transactionService.logError(txId, e.message);
+      throw e;
+    }
+
+    // GUARD: Dry Run Mode
+    if (this.isDryRun && ['write_file', 'run_shell', 'invalidate_memory'].includes(toolName)) {
+      const msg = `[DRY RUN] Would execute ${toolName}`;
+      logger.info(msg);
+      await transactionService.logComplete(txId, { dry_run: true, message: msg });
+      return { status: 'dry_run', message: msg };
+    }
+
+    try {
+      let result;
+      switch (toolName) {
+        case 'read_file':
+          result = await this.readFile(args.path);
+          break;
+        case 'write_file':
+          // GUARD: Approval for NEW files
+          await this.ensureApprovalForWrite(args.path);
+          result = await this.writeFile(args.path, args.content);
+          break;
+        case 'list_files':
+          result = await this.listFiles(args.path || '.');
+          break;
+        case 'run_shell':
+          // Shell is already allowlisted, but let's be extra safe for sensitive ops if needed
+          result = await this.runShell(args.command);
+          break;
+        // ... (other cases map directly)
+        case 'web_search': result = await this.webSearch(args.query); break;
+        case 'fetch_web_content': result = await this.fetchWebContent(args.url); break;
+        case 'capture_ui': result = await this.captureUI(); break;
+        case 'get_ui_text': result = await this.getUIText(); break;
+        case 'resize_image': result = await this.resizeImage(args.path, args.width, args.height); break;
+        case 'crop_image': result = await this.cropImage(args.path, args.left, args.top, args.width, args.height); break;
+        case 'apply_image_filter': result = await this.applyImageFilter(args.path, args.filter); break;
+        case 'get_image_info': result = await this.getImageInfo(args.path); break;
+        case 'crystallize_memory': result = await this.crystallizeMemory(args.content, args.type, args.tags); break;
+        case 'invalidate_memory': result = await this.invalidateMemory(args.memoryId, args.reason, args.replacementId); break;
+        default:
+          throw new Error(`Unknown tool: ${toolName}`);
+      }
+
+      await transactionService.logComplete(txId, result);
+      return result;
+
+    } catch (error: any) {
+      await transactionService.logError(txId, error.message);
+      throw error;
+    }
+  }
+
+  private async ensureApprovalForWrite(filePath: string) {
+    const fullPath = validatePath(filePath);
+    try {
+      await fs.access(fullPath);
+      // File exists, overwrite is currently allowed (could add versioning here later)
+    } catch {
+      // File does NOT exist. Trigger Approval Flow.
+      if (process.env.AUTO_APPROVE === 'true') {
+        logger.info(`[ToolService] Auto-approving new file creation: ${filePath}`);
+        return;
+      }
+      
+      const { supervisorService } = require('./supervisorService');
+      logger.warn(`[ToolService] New file creation requires approval: ${filePath}`);
+      supervisorService.emitEvent('APPROVAL_REQUIRED', { 
+        type: 'file_create', 
+        path: filePath,
+        timeout: 60000 
+      });
+
+      // In a real scenario, we would await a Promise here that resolves via a Socket event listener.
+      // For this implementation iteration, we will throw to BLOCK it safe until UI is ready.
+      // This forces the user to explicitly enable AUTO_APPROVE or implementing the UI handler.
+      throw new Error(`APPROVAL_REQUIRED: Creation of ${filePath} requires user confirmation.`);
     }
   }
 
@@ -118,7 +173,7 @@ export class ToolService {
     }
 
     // Append to notes for visibility
-    const notesPath = path.join(this.rootDir, '.solvent_notes.md');
+    const notesPath = path.join(PROJECT_ROOT, '.solvent_notes.md');
     const note = `\n### [MEMORY DEPRECATED] ${new Date().toLocaleDateString()}\n**ID:** ${memoryId}\n**Reason:** ${reason}\n${replacementId ? `**Superseded By:** ${replacementId}` : ''}\n---\n`;
     await fs.appendFile(notesPath, note).catch(e => logger.warn('[ToolService] Note append failed', e));
 
@@ -139,7 +194,7 @@ export class ToolService {
     });
 
     // 2. Append to Solvent Notes (Visible context bridge)
-    const notesPath = path.join(this.rootDir, '.solvent_notes.md');
+    const notesPath = path.join(PROJECT_ROOT, '.solvent_notes.md');
     const formattedEntry = `\n### [${type.toUpperCase()}] ${new Date().toLocaleDateString()}\n**Tags:** ${tags.join(', ')}\n\n${content}\n\n---\n`;
     
     try {
@@ -161,7 +216,7 @@ export class ToolService {
   }
 
   private async getImageInfo(imagePath: string) {
-    const fullPath = path.join(this.rootDir, imagePath);
+    const fullPath = validatePath(imagePath);
     const metadata = await sharp(fullPath).metadata();
     return {
       width: metadata.width,
@@ -175,7 +230,7 @@ export class ToolService {
   }
 
   private async resizeImage(imagePath: string, width?: number, height?: number) {
-    const fullPath = path.join(this.rootDir, imagePath);
+    const fullPath = validatePath(imagePath);
     const ext = path.extname(fullPath);
     const outputPath = fullPath.replace(ext, `_resized_${Date.now()}${ext}`);
     
@@ -186,13 +241,13 @@ export class ToolService {
     return {
       status: 'success',
       originalPath: imagePath,
-      outputPath: path.relative(this.rootDir, outputPath),
+      outputPath: path.relative(PROJECT_ROOT, outputPath),
       message: `Image resized to ${width || 'auto'}x${height || 'auto'}`
     };
   }
 
   private async cropImage(imagePath: string, left: number, top: number, width: number, height: number) {
-    const fullPath = path.join(this.rootDir, imagePath);
+    const fullPath = validatePath(imagePath);
     const ext = path.extname(fullPath);
     const outputPath = fullPath.replace(ext, `_cropped_${Date.now()}${ext}`);
     
@@ -203,13 +258,13 @@ export class ToolService {
     return {
       status: 'success',
       originalPath: imagePath,
-      outputPath: path.relative(this.rootDir, outputPath),
+      outputPath: path.relative(PROJECT_ROOT, outputPath),
       message: `Image cropped to ${width}x${height} at ${left},${top}`
     };
   }
 
   private async applyImageFilter(imagePath: string, filter: 'grayscale' | 'sepia' | 'blur' | 'sharpen') {
-    const fullPath = path.join(this.rootDir, imagePath);
+    const fullPath = validatePath(imagePath);
     const ext = path.extname(fullPath);
     const outputPath = fullPath.replace(ext, `_filter_${filter}_${Date.now()}${ext}`);
     
@@ -240,7 +295,7 @@ export class ToolService {
     return {
       status: 'success',
       originalPath: imagePath,
-      outputPath: path.relative(this.rootDir, outputPath),
+      outputPath: path.relative(PROJECT_ROOT, outputPath),
       message: `Applied ${filter} filter to image.`
     };
   }
@@ -258,7 +313,7 @@ export class ToolService {
   }
 
   private async captureUI() {
-    const uploadDir = path.join(this.rootDir, 'backend/uploads');
+    const uploadDir = path.join(PROJECT_ROOT, 'backend/uploads');
 
     // 1. Maintain Rolling Cache (Keep only last 3)
     try {
@@ -313,21 +368,21 @@ export class ToolService {
   }
 
   private async readFile(filePath: string) {
-    const fullPath = path.join(this.rootDir, filePath);
+    const fullPath = validatePath(filePath);
     const content = await fs.readFile(fullPath, 'utf-8');
     vectorService.addEntry(content.slice(0, 5000), { path: filePath, type: 'file_read' }).catch(console.error);
     return content;
   }
 
   private async writeFile(filePath: string, content: string) {
-    const fullPath = path.join(this.rootDir, filePath);
+    const fullPath = validatePath(filePath);
     await fs.writeFile(fullPath, content);
     vectorService.addEntry(content.slice(0, 5000), { path: filePath, type: 'file_write' }).catch(console.error);
     return { status: 'success', path: filePath };
   }
 
   private async listFiles(dirPath: string) {
-    const fullPath = path.join(this.rootDir, dirPath);
+    const fullPath = validatePath(dirPath);
     const files = await fs.readdir(fullPath, { withFileTypes: true });
     return files.map(f => ({
       name: f.name,
@@ -337,22 +392,18 @@ export class ToolService {
 
   /**
    * Executes a shell command with security restrictions.
-   * 
+   *
    * Security measures:
    * 1. Uses explicit allowlist of permitted command prefixes (not a denylist)
    * 2. Blocks dangerous commands (rm -rf, mkfs, dd, sudo, etc.)
    * 3. Uses spawn with argument array to avoid shell interpolation
    * 4. Sets NO_COLOR=1 environment variable
-   * 5. Restricts working directory to rootDir
-   * 
-   * @param command - The command to execute
-   * @returns Promise resolving to stdout and stderr
-   * @throws {Error} If command is not allowed or execution fails
+   * 5. Restricts working directory to PROJECT_ROOT
    */
   private async runShell(command: string): Promise<{ stdout: string; stderr: string }> {
     // Check if arbitrary shell execution is explicitly enabled
     const allowArbitraryShell = process.env.SOLVENT_ALLOW_SHELL === 'true';
-    
+
     if (!allowArbitraryShell) {
       // Security: Check against allowlist
       const normalizedCommand = command.trim().toLowerCase();
@@ -377,36 +428,36 @@ export class ToolService {
         );
       }
     }
-    
+
     // Parse command into executable and arguments for spawn
     // This avoids shell interpolation vulnerabilities
     const parts = command.trim().split(/\s+/);
     const executable = parts[0];
     const args = parts.slice(1);
-    
+
     return new Promise((resolve, reject) => {
       const child = spawn(executable, args, {
-        cwd: this.rootDir,
+        cwd: PROJECT_ROOT,
         env: { ...process.env, NO_COLOR: '1' },
         shell: false, // Security: Never use shell when spawning
         stdio: ['pipe', 'pipe', 'pipe']
       });
-      
+
       let stdout = '';
       let stderr = '';
-      
+
       child.stdout.on('data', (data) => {
         stdout += data.toString();
       });
-      
+
       child.stderr.on('data', (data) => {
         stderr += data.toString();
       });
-      
+
       child.on('error', (err) => {
         reject(new Error(`Command execution failed: ${err.message}`));
       });
-      
+
       child.on('close', (code) => {
         if (code === 0) {
           resolve({ stdout, stderr });

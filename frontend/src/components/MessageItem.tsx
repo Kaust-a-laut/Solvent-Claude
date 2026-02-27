@@ -140,9 +140,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         {/* Main Message Bubble */}
         <div className={cn(
           "prose prose-invert max-w-none prose-p:leading-[1.6] prose-pre:p-0 prose-pre:bg-transparent font-sans",
-          isUser 
+          isUser
             ? cn("glass-panel bg-jb-accent/5 rounded-2xl rounded-tr-sm p-3.5 px-4 inline-block text-white text-left border-jb-accent/20", compact ? "text-[11px] p-2 px-3" : "text-[13px]")
-            : cn("text-slate-300", compact ? "text-[12px]" : "text-[14.5px]")
+            : cn("text-slate-300 liquid-message rounded-2xl p-4 -ml-4", compact ? "text-[12px] p-2 -ml-2" : "text-[14.5px]")
         )}>
            <ReactMarkdown 
               remarkPlugins={[remarkGfm]}

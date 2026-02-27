@@ -42,14 +42,31 @@ export const DebateArea = () => {
      setRightHistory([]);
 
      try {
-         const leftResponse = await callModel('gemini', 'gemini-1.5-flash', [], `Present a strong argument for: "${topic}". Be concise and provocative.`);
-         setLeftHistory([{ agent: 'Gemini Pro', content: leftResponse }]);
+         const response = await fetch(`${API_BASE_URL}/debate`, {
+           method: 'POST',
+           headers: { 
+             'Content-Type': 'application/json',
+             'x-solvent-secret': 'solvent_dev_insecure_default' // Using default for now
+           },
+           body: JSON.stringify({ topic })
+         });
          
-         const rightResponse = await callModel('ollama', 'qwen2.5:3b', [], `Critique this argument aggressively: "${leftResponse}". Defend the opposing view.`);
-         setRightHistory([{ agent: 'Qwen 2.5', content: rightResponse }]);
+         if (!response.ok) {
+           const errData = await response.json();
+           throw new Error(errData.error || 'Debate failed.');
+         }
+
+         const result = await response.json();
          
-         const leftRebuttal = await callModel('gemini', 'gemini-1.5-flash', [], `Your argument was critiqued: "${rightResponse}". Counter this critique effectively.`);
-         setLeftHistory(prev => [...prev, { agent: 'Gemini Pro', content: leftRebuttal }]);
+         // Map the result rounds to the UI columns
+         // Result rounds: [proponent (Gemini), critic (Ollama), synthesizer (Gemini)]
+         const proponent = result.rounds.find((r: any) => r.role === 'proponent');
+         const critic = result.rounds.find((r: any) => r.role === 'critic');
+         const synthesis = result.rounds.find((r: any) => r.role === 'synthesizer');
+
+         if (proponent) setLeftHistory([{ agent: 'Gemini Pro', content: proponent.content }]);
+         if (critic) setRightHistory([{ agent: 'Qwen 2.5', content: critic.content }]);
+         if (synthesis) setLeftHistory(prev => [...prev, { agent: 'Gemini Pro (Synthesized)', content: synthesis.content }]);
 
      } catch (e: any) {
          console.error(e);
