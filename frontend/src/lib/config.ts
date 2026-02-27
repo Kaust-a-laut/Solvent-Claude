@@ -44,6 +44,6 @@ export const APP_CONFIG = {
   defaults: {
     temperature: 0.7,
     maxTokens: 4096,
-    imageProvider: 'huggingface' as const
+    imageProvider: 'pollinations' as const
   }
 };

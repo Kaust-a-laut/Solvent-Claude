@@ -1,11 +1,11 @@
 import { AIProviderFactory } from './aiProviderFactory';
 import { WaterfallService } from './waterfallService';
 import { contextService } from './contextService';
-import { ChatRequestData, AIProvider } from '../types/ai';
+import { ChatRequestData, ChatMessage, CompletionOptions } from '../types/ai';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs/promises';
-import { AppError, ErrorType } from '../utils/AppError';
+import { SolventError } from '../utils/errors';
 import { GeminiService } from './geminiService';
 import { searchService } from './searchService';
 import { vectorService } from './vectorService';
@@ -18,10 +18,65 @@ import { config, APP_CONSTANTS } from '../config';
 import { telemetryService } from './telemetryService';
 import { supervisorService } from './supervisorService';
 
+// --- Named Constants ---
+
+/**
+ * Keywords that indicate image generation intent
+ */
+const IMAGE_INTENT_KEYWORDS = [
+  'generate an image', 'create an image', 'draw', 'paint', 'make a picture',
+  'show me a picture', 'generate a picture', 'imagine', 'visualize',
+  'generate image', 'make image', 'render', 'create image'
+];
+
+/**
+ * Regex pattern for explicit image generation intent at start of message
+ */
+const EXPLICIT_IMAGE_INTENT_REGEX = /^(draw|imagine|visualize|generate|make|create)\b/i;
+
+/**
+ * Regex pattern for removing image intent phrases from prompt
+ */
+const IMAGE_INTENT_CLEANUP_REGEX = /generate an image of|create an image of|draw|paint|make a picture of|show me a picture of|generate a picture of|create a picture of|imagine|render|visualize|generate image of|make image of|generate|draw|make|create|please|can you|could you|i want you to|i'd like you to/gi;
+
+/**
+ * Regex pattern for detecting code-related requests in vision mode
+ */
+const CODE_REQUEST_REGEX = /code|build|implement|create|react|html|css|component/i;
+
+/**
+ * Gemini model fallback chain
+ */
+const GEMINI_MODEL_CHAIN = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
+// --- Types ---
+
+interface ImageIntentResult {
+  isImageRequest: boolean;
+  imagePrompt: string;
+}
+
+interface CompletionResponse {
+  response: string;
+  model: string;
+  info?: string;
+  waterfall?: any;
+  provenance?: any;
+  isGeneratedImage?: boolean;
+  imageUrl?: string;
+}
+
+interface EnrichedContextResult {
+  messages: ChatMessage[];
+  provenance: any;
+}
+
+// --- AIService Class ---
+
 export class AIService {
   private waterfallService = new WaterfallService();
 
-  private normalizeMessages(messages: any[]) {
+  private normalizeMessages(messages: ChatMessage[]): ChatMessage[] {
     return messages.map(m => ({
       ...m,
       role: m.role === 'model' ? 'assistant' : m.role
@@ -32,109 +87,56 @@ export class AIService {
     return searchService.webSearch(query);
   }
 
-  async processChat(data: ChatRequestData) {
+  async processChat(data: ChatRequestData): Promise<CompletionResponse> {
     const startTime = Date.now();
     const { provider, model, image, mode, smartRouter, fallbackModel, temperature, maxTokens, apiKeys, thinkingModeEnabled, imageProvider } = data;
-    
+
     try {
       const lastUserMessage = data.messages[data.messages.length - 1]?.content || "";
 
       // --- GUARDIAN ANGEL HOOK (Proactive Value) ---
-      // Fire-and-forget: Check if this request violates any established rules or needs guidance.
-      // We combine the user's prompt with the names of open files to give the Supervisor context.
       const contextFocus = `${lastUserMessage} ${data.openFiles ? data.openFiles.map(f => f.path).join(', ') : ''}`;
       supervisorService.provideGuidance(contextFocus).catch(err => {
         logger.warn(`[AIService] Guardian Angel check failed: ${err.message}`);
       });
       // ---------------------------------------------
 
-      const isSmartRouterEnabled = smartRouter !== false;
-
       // 1. Detect Image Intent
-      const imageKeywords = ['generate an image', 'create an image', 'draw', 'paint', 'make a picture', 'show me a picture', 'generate a picture', 'imagine', 'visualize', 'generate image', 'make image', 'render', 'create image'];
-      const isExplicitIntent = /^(draw|imagine|visualize|generate|make|create)\b/i.test(lastUserMessage.trim().replace(/^(please|can you|could you|i want to|i need to|i'd like to)\s+/i, ''));
-      const isImageIntent = imageKeywords.some(k => lastUserMessage.toLowerCase().includes(k)) || 
-                           /\b(draw|generate|imagine|render|visualize|make|create)\b.*\b(image|picture|photo|graphic|art|sketch)\b/i.test(lastUserMessage) ||
-                           isExplicitIntent;
-
-      if (isImageIntent && (mode === 'vision' || isExplicitIntent)) {
-        logger.info(`[AIService] Image intent detected: "${lastUserMessage}"`);
-        try {
-          const prompt = lastUserMessage.replace(/generate an image of|create an image of|draw|paint|make a picture of|show me a picture of|generate a picture of|create a picture of|imagine|render|visualize|generate image of|make image of|generate|draw|make|create|please|can you|could you|i want you to|i'd like you to/gi, '').trim() || lastUserMessage;
-          logger.info(`[AIService] Cleaned image prompt: "${prompt}"`);
-          const result = await this.generateImage(prompt, undefined, apiKeys?.gemini, imageProvider || 'auto', { apiKeys });
-         
-          telemetryService.logTransaction({
-            id: uuidv4(),
-            type: 'image',
-            model: imageProvider || 'auto',
-            provider: imageProvider || 'auto',
-            latencyMs: Date.now() - startTime,
-            status: 'success'
-          });
-
-          return {
-            response: `I've generated the image for you: "${prompt}"`, 
-            model: imageProvider === 'huggingface' ? 'Hugging Face' : imageProvider === 'local' ? 'Local Juggernaut' : 'Image Router',
-            isGeneratedImage: true,
-            imageUrl: result.imageUrl 
-          };
-        } catch (err: any) {
-          logger.error(`[AIService] Inline image generation failed: ${err.message}`);
-          throw new AppError(`Image generation failed: ${err.message}`, ErrorType.PROVIDER_FAILURE, 502);
-        }
+      const imageIntent = this.detectImageIntent(lastUserMessage, mode);
+      if (imageIntent.isImageRequest) {
+        return this.handleImageRequest(imageIntent.imagePrompt, imageProvider, apiKeys, startTime);
       }
 
       logger.info(`Processing chat request with provider: ${provider}, model: ${model}`);
 
       // 2. Enrich Context
-      const { messages: enrichedMessages, provenance } = await contextService.enrichContext(data);
+      const { messages: enrichedMessages, provenance } = await this.enrichContext(data);
       const normalizedMessages = this.normalizeMessages(enrichedMessages);
 
       // 3. Inject Thinking Instructions
-      let finalMessages = normalizedMessages;
-      if (thinkingModeEnabled) {
-        const thinkingInstruction = {
-          role: 'system' as const,
-          content: `[DEEP THINKING MODE ACTIVE]
-          You MUST perform an exhaustive chain-of-thought analysis BEFORE providing your final answer.
-          Output your internal reasoning process inside <thinking> tags.`
-        };
-        finalMessages = [thinkingInstruction, ...normalizedMessages];
-      }
+      const finalMessages = this.injectThinkingMode(normalizedMessages, thinkingModeEnabled);
 
-      // 4. Execution
-      let responseData: any;
+      // 4. Execute Completion
+      let responseData: CompletionResponse;
       if (provider === 'gemini') {
-        responseData = await this.handleGeminiChat(finalMessages, model, image, mode, isSmartRouterEnabled, fallbackModel, temperature, maxTokens, apiKeys, data.openFiles);
+        responseData = await this.executeGeminiCompletion(
+          finalMessages, model, image, mode, smartRouter !== false, fallbackModel,
+          temperature, maxTokens, apiKeys, data.openFiles
+        );
       } else {
-        try {
-          const selectedProvider = await AIProviderFactory.getProvider(provider);
-          const response = await selectedProvider.complete(finalMessages, {
-            model,
-            temperature,
-            maxTokens,
-            apiKey: apiKeys?.[provider]
-          });
-          responseData = { response, model };
-        } catch (error: any) {
-          console.warn(`${provider} failed, initiating fallback: ${error.message}`);
-          responseData = await this.handleFallbacks(finalMessages, mode, fallbackModel, temperature, maxTokens, error, apiKeys, provider);
-        }
+        responseData = await this.executeProviderCompletion(
+          provider, finalMessages, model, temperature, maxTokens, apiKeys,
+          fallbackModel, mode, data
+        );
       }
 
-      // 5. Attach Provenance for UI
-      if (responseData) {
-        responseData.provenance = provenance;
-      }
+      // 5. Attach Provenance
+      responseData = this.attachProvenance(responseData, provenance);
 
-      // 6. Memory
-      if (responseData && responseData.response && mode) {
-        const allMessages = [...data.messages, { role: 'assistant', content: responseData.response }];
-        memoryConsolidationService.consolidateSession(mode, allMessages as any).catch(e => logger.error('Memory sync failed', e));
-        memoryConsolidationService.extractKnowledge(responseData.response).catch(() => {});
-      }
+      // 6. Consolidate Memory (fire-and-forget)
+      this.consolidateMemory(mode, data.messages, responseData);
 
+      // 7. Log Telemetry
       telemetryService.logTransaction({
         id: uuidv4(),
         type: 'chat',
@@ -147,7 +149,8 @@ export class AIService {
 
       return responseData;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       telemetryService.logTransaction({
         id: uuidv4(),
         type: 'chat',
@@ -155,17 +158,110 @@ export class AIService {
         provider: provider,
         latencyMs: Date.now() - startTime,
         status: 'error',
-        error: error.message
+        error: err.message
       });
       throw error;
     }
   }
 
-  // --- Helpers ---
+  // --- Decomposed Methods ---
 
-  private async handleGeminiChat(messages: any[], model: string, image: any, mode: any, shouldSearch: boolean, fallbackModel: any, temp: any, maxTokens: any, apiKeys?: Record<string, string>, openFiles?: any[]) {
-    const GEMINI_CHAIN = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-    const modelChain = GEMINI_CHAIN.includes(model) ? [model, ...GEMINI_CHAIN.filter(m => m !== model)] : [model, ...GEMINI_CHAIN];
+  /**
+   * Detects if the user message has image generation intent.
+   */
+  private detectImageIntent(message: string, mode?: string): ImageIntentResult {
+    const isExplicitIntent = EXPLICIT_IMAGE_INTENT_REGEX.test(
+      message.trim().replace(/^(please|can you|could you|i want to|i need to|i'd like to)\s+/i, '')
+    );
+    const isImageIntent = IMAGE_INTENT_KEYWORDS.some(k => message.toLowerCase().includes(k)) ||
+                         /\b(draw|generate|imagine|render|visualize|make|create)\b.*\b(image|picture|photo|graphic|art|sketch)\b/i.test(message) ||
+                         isExplicitIntent;
+
+    if (isImageIntent && (mode === 'vision' || isExplicitIntent)) {
+      const cleanedPrompt = message.replace(IMAGE_INTENT_CLEANUP_REGEX, '').trim() || message;
+      return { isImageRequest: true, imagePrompt: cleanedPrompt };
+    }
+
+    return { isImageRequest: false, imagePrompt: '' };
+  }
+
+  /**
+   * Handles image generation requests.
+   */
+  private async handleImageRequest(
+    prompt: string,
+    imageProvider: string | undefined,
+    apiKeys: Record<string, string> | undefined,
+    startTime: number
+  ): Promise<CompletionResponse> {
+    logger.info(`[AIService] Image intent detected: "${prompt}"`);
+    
+    try {
+      const result = await this.generateImage(prompt, undefined, apiKeys?.gemini, imageProvider || 'auto', { apiKeys });
+
+      telemetryService.logTransaction({
+        id: uuidv4(),
+        type: 'image',
+        model: imageProvider || 'auto',
+        provider: imageProvider || 'auto',
+        latencyMs: Date.now() - startTime,
+        status: 'success'
+      });
+
+      return {
+        response: `I've generated the image for you: "${prompt}"`,
+        model: imageProvider === 'huggingface' ? 'Hugging Face' : imageProvider === 'local' ? 'Local Juggernaut' : 'Image Router',
+        isGeneratedImage: true,
+        imageUrl: result.imageUrl
+      };
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`[AIService] Inline image generation failed: ${error.message}`);
+      throw SolventError.provider(`Image generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Enriches messages with context from vector memory.
+   */
+  private async enrichContext(data: ChatRequestData): Promise<EnrichedContextResult> {
+    return contextService.enrichContext(data);
+  }
+
+  /**
+   * Injects thinking mode instructions if enabled.
+   */
+  private injectThinkingMode(messages: ChatMessage[], thinkingModeEnabled?: boolean): ChatMessage[] {
+    if (!thinkingModeEnabled) return messages;
+    
+    const thinkingInstruction: ChatMessage = {
+      role: 'system',
+      content: `[DEEP THINKING MODE ACTIVE]
+You MUST perform an exhaustive chain-of-thought analysis BEFORE providing your final answer.
+Output your internal reasoning process inside <thinking> tags.`
+    };
+    return [thinkingInstruction, ...messages];
+  }
+
+  /**
+   * Executes completion using Gemini provider.
+   */
+  private async executeGeminiCompletion(
+    messages: ChatMessage[],
+    model: string,
+    image: any,
+    mode: string | undefined,
+    shouldSearch: boolean,
+    fallbackModel: any,
+    temp: number | undefined,
+    maxTokens: number | undefined,
+    apiKeys?: Record<string, string>,
+    openFiles?: any[]
+  ): Promise<CompletionResponse> {
+    const modelChain = GEMINI_MODEL_CHAIN.includes(model)
+      ? [model, ...GEMINI_MODEL_CHAIN.filter(m => m !== model)]
+      : [model, ...GEMINI_MODEL_CHAIN];
+    
     const gemini = await AIProviderFactory.getProvider('gemini');
 
     try {
@@ -184,26 +280,81 @@ export class AIService {
             apiKey: apiKeys?.gemini
           });
           return { response, model: currentModel };
-        } catch (err: any) {
-          console.warn(`Gemini ${currentModel} failed, trying next...`);
+        } catch (err: unknown) {
+          logger.warn(`Gemini ${currentModel} failed, trying next...`);
         }
       }
       throw new Error('Gemini chain exhausted.');
-    } catch (e: any) {
-      return this.handleFallbacks(messages, mode, fallbackModel, temp, maxTokens, e, apiKeys, 'gemini');
+    } catch (e: unknown) {
+      const error = e instanceof Error ? e : new Error(String(e));
+      return this.handleFallbacks(messages, mode, fallbackModel, temp, maxTokens, error, apiKeys, 'gemini');
     }
   }
+
+  /**
+   * Executes completion using a non-Gemini provider with fallback support.
+   */
+  private async executeProviderCompletion(
+    provider: string,
+    messages: ChatMessage[],
+    model: string,
+    temp: number | undefined,
+    maxTokens: number | undefined,
+    apiKeys: Record<string, string> | undefined,
+    fallbackModel: any,
+    mode: string | undefined,
+    data: ChatRequestData
+  ): Promise<CompletionResponse> {
+    try {
+      const selectedProvider = await AIProviderFactory.getProvider(provider);
+      const response = await selectedProvider.complete(messages, {
+        model,
+        temperature: temp,
+        maxTokens,
+        apiKey: apiKeys?.[provider]
+      });
+      return { response, model };
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.warn(`${provider} failed, initiating fallback: ${err.message}`);
+      return this.handleFallbacks(messages, mode, fallbackModel, temp, maxTokens, err, apiKeys, provider);
+    }
+  }
+
+  /**
+   * Attaches provenance information to the response.
+   */
+  private attachProvenance(response: CompletionResponse, provenance: any): CompletionResponse {
+    return { ...response, provenance };
+  }
+
+  /**
+   * Consolidates memory from the conversation (fire-and-forget).
+   */
+  private consolidateMemory(
+    mode: string | undefined,
+    messages: ChatMessage[],
+    response: CompletionResponse
+  ): void {
+    if (!mode || !response.response) return;
+    
+    const allMessages = [...messages, { role: 'assistant', content: response.response }];
+    memoryConsolidationService.consolidateSession(mode, allMessages as any).catch(e => logger.error('Memory sync failed', e));
+    memoryConsolidationService.extractKnowledge(response.response).catch(e => logger.warn('[AIService] Knowledge extraction failed', e));
+  }
+
+  // --- Existing Helper Methods (unchanged) ---
 
   private async handleVisionRequest(messages: any[], image: any, model: string, temp: any, maxTokens: any, apiKey?: string, openFiles?: any[]) {
     const gemini = await AIProviderFactory.getProvider('gemini');
     try {
       const targetImage = image || messages.find(m => m.image)?.image;
-      if (!targetImage) throw AppError.validation('No image for vision mode.');
+      if (!targetImage) throw SolventError.validation('No image for vision mode.');
       const matches = targetImage.match(/^data:(.+);base64,(.+)$/);
-      if (!matches) throw AppError.validation('Invalid image format.');
+      if (!matches) throw SolventError.validation('Invalid image format.');
 
       const lastMessage = messages[messages.length - 1].content;
-      const isCodeRequest = /code|build|implement|create|react|html|css|component/i.test(lastMessage);
+      const isCodeRequest = CODE_REQUEST_REGEX.test(lastMessage);
 
       const response = await gemini.vision!(
         lastMessage,
@@ -217,7 +368,7 @@ export class AIService {
       );
 
       if (isCodeRequest) {
-        console.log("[AIService] Vision-to-Code bridge triggered.");
+        logger.info("[AIService] Vision-to-Code bridge triggered.");
         const waterfallResult = await this.runAgenticWaterfall(`Convert this UI analysis into production code: ${response}`, undefined, APP_CONSTANTS.WATERFALL.MAX_RETRIES, undefined, undefined, openFiles);
         return {
           response: `### Vision Analysis\n${response}\n\n### Generated Implementation\n${waterfallResult.executor.code}`,
@@ -227,9 +378,10 @@ export class AIService {
       }
 
       return { response, model };
-    } catch (error: any) {
-      if (error instanceof AppError) throw error;
-      throw AppError.provider(`Vision failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof SolventError) throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      throw SolventError.provider(`Vision failed: ${err.message}`);
     }
   }
 
@@ -255,14 +407,14 @@ export class AIService {
       const res = await ollama.complete(messages, { model: 'qwen2.5-coder:7b', temperature: temp, maxTokens, apiKey: apiKeys?.ollama });
       return { response: res, model: 'local/ollama', info: 'Local fallback' };
     } catch (e: any) {
-       throw new AppError(`All providers failed. Last: ${e.message}`, ErrorType.PROVIDER_FAILURE, 502);
+       throw SolventError.provider(`All providers failed. Last: ${e.message}`);
     }
   }
 
   async generateImage(prompt: string, model?: string, apiKey?: string, provider: string = 'auto', options: any = {}) {
     let targetProvider = provider;
     if (provider === 'auto') {
-      targetProvider = (config.HUGGINGFACE_API_KEY || options.apiKeys?.huggingface) ? 'huggingface' : 'gemini';
+      targetProvider = (config.HUGGINGFACE_API_KEY || options.apiKeys?.huggingface) ? 'huggingface' : 'pollinations';
     }
 
     if (targetProvider === 'local') {
@@ -272,7 +424,7 @@ export class AIService {
 
     if (targetProvider === 'huggingface') {
       const hfKey = options.apiKeys?.huggingface || config.HUGGINGFACE_API_KEY;
-      if (!hfKey) throw new AppError('Hugging Face API Token missing', ErrorType.VALIDATION, 400);
+      if (!hfKey) throw SolventError.validation('Hugging Face API Token missing');
       const result = await huggingFaceService.generateImage(prompt, hfKey, model);
       return this.saveImage(result.base64, 'Hugging Face');
     }
@@ -281,8 +433,6 @@ export class AIService {
       const gemini = await AIProviderFactory.getProvider('gemini');
       const geminiKey = options.apiKeys?.gemini || apiKey || config.GEMINI_API_KEY;
       if (!geminiKey) throw new Error('Gemini API key missing');
-      // Note: Image generation might need to be handled differently in the plugin system
-      // For now, we'll keep the direct call to geminiService for image generation
       const result = await gemini.complete([{role: 'user', content: `Generate an image with the prompt: ${prompt}`}], {
         model: model || 'imagen-3.0-generate-001',
         apiKey: geminiKey
@@ -293,7 +443,7 @@ export class AIService {
         const result = await pollinationsService.generateImage(prompt);
         return this.saveImage(result.base64, 'Pollinations.ai');
       } catch (pollError: any) {
-        throw new AppError(`All image providers failed.`, ErrorType.PROVIDER_FAILURE, 502);
+        throw SolventError.provider('All image providers failed.');
       }
     }
   }
@@ -311,8 +461,6 @@ export class AIService {
     const models: Record<string, string[]> = {};
 
     for (const provider of providers) {
-      // For now, return a default model for each provider
-      // In a real implementation, providers would expose their available models
       models[provider.id] = [provider.defaultModel || 'default-model'];
     }
 
@@ -351,7 +499,6 @@ export class AIService {
       health[provider.id] = provider.isReady() ? 'connected' : 'disconnected';
     }
 
-    // Also check Ollama separately if it's not a plugin
     health.ollama = await this.checkOllamaHealth();
 
     return {
@@ -361,13 +508,12 @@ export class AIService {
   }
 
   async getSessionContext() {
-    // Value: Instantly orient the user when they return to the app.
     try {
       const recent = await vectorService.getRecentEntries(20);
       const consolidation = recent
         .filter(m => m.metadata.type === 'memory_consolidation' || m.metadata.type === 'meta_summary')
-        .pop(); // Get the very latest one
-      
+        .pop();
+
       return consolidation ? consolidation.metadata.text : null;
     } catch (e) {
       return null;

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["scripts/dev-frontend.sh"],
+      "port": 5173
+    },
+    {
+      "name": "Backend (Express)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:backend"],
+      "port": 3001
+    }
+  ]
+}

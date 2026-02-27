@@ -63,6 +63,15 @@ export const MessageList = ({ compact }: MessageListProps) => {
       {/* Waterfall Visualization at the top (or contextually could be interspersed, but top is safe) */}
       <WaterfallVisualizer />
 
+      {messages.length === 0 && !isProcessing && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-24 opacity-30 pointer-events-none">
+          <svg viewBox="0 0 100 100" className="w-16 h-16 fill-slate-600">
+            <path d="M38 20 L38 45 L18 82 Q15 88 22 88 L78 88 Q85 88 82 82 L62 45 L62 20 Z" />
+          </svg>
+          <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-600">Begin a session</p>
+        </div>
+      )}
+
       <AnimatePresence initial={false}>
         {messages.map((m, i) => (
           <MessageItem 

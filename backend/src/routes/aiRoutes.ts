@@ -7,11 +7,27 @@ import { orchestrationService } from '../services/orchestrationService';
 
 const router = Router();
 
-// Restore the chat endpoint that was removed in a previous refactor
+// ── Core Chat ──────────────────────────────────────────────────────────────
 router.post('/chat', AIController.chat);
 
-// ... (rest of imports)
+// ── Waterfall (SSE streaming) ──────────────────────────────────────────────
+router.post('/waterfall', AIController.waterfall);
 
+// ── Image Generation ──────────────────────────────────────────────────────
+router.post('/generate-image', AIController.generateImage);
+
+// ── Web Search ────────────────────────────────────────────────────────────
+router.post('/search', AIController.search);
+
+// ── Model / Health Discovery ──────────────────────────────────────────────
+router.get('/models', AIController.listModels);
+router.get('/health/services', AIController.checkHealth);
+router.get('/local-image-status', AIController.checkLocalImageStatus);
+
+// ── Agentic Compare ───────────────────────────────────────────────────────
+router.post('/compare', AIController.compare);
+
+// ── Multi-Agent Collaborate ───────────────────────────────────────────────
 router.post('/collaborate', async (req, res) => {
   const { goal, missionType = 'consultation', async: isAsync, provider, model } = req.body;
   if (!goal) return res.status(400).json({ error: 'Goal is required' });

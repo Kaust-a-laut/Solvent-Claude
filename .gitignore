@@ -35,3 +35,10 @@ Thumbs.db
 GEMINI.md
 VIBE.md
 .aider*
+
+# Solvent runtime data (memory index, telemetry — not for version control)
+.solvent_memory.json
+.solvent_hnsw.bin
+.solvent_hnsw.bin.meta.json
+.solvent_telemetry.jsonl
+.solvent_notes.md

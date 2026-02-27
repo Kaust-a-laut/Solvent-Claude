@@ -1,13 +1,66 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import axios from 'axios';
 import { vectorService } from './vectorService';
 import screenshot from 'screenshot-desktop';
 import sharp from 'sharp';
+import { logger } from '../utils/logger';
 
-const execPromise = promisify(exec);
+// Security: Explicit allowlist of permitted command prefixes
+// This replaces the insecure denylist approach which was trivially bypassed
+const ALLOWED_COMMAND_PREFIXES = [
+  'git ',
+  'npm ',
+  'npx ',
+  'node ',
+  'python ',
+  'python3 ',
+  'ls ',
+  'cat ',
+  'echo ',
+  'pwd',
+  'whoami',
+  'date',
+  'head ',
+  'tail ',
+  'grep ',
+  'find ',
+  'mkdir ',
+  'touch ',
+  'cp ',
+  'mv ',
+  'rm ',
+  'code ',
+  'tsc ',
+  'eslint ',
+  'prettier ',
+  'jest ',
+  'vitest ',
+  'pnpm ',
+  'yarn ',
+  'bun ',
+  'docker ',
+  'curl ',
+  'wget '
+];
+
+// Commands that require explicit opt-in via SOLVENT_ALLOW_SHELL=true
+const DANGEROUS_COMMANDS = [
+  'rm -rf',
+  'mkfs',
+  'dd',
+  'chmod',
+  'chown',
+  'sudo',
+  'su ',
+  'curl |',
+  'wget |',
+  'bash -c',
+  'sh -c',
+  'eval ',
+  'exec '
+];
 
 export class ToolService {
   private rootDir: string;
@@ -67,7 +120,7 @@ export class ToolService {
     // Append to notes for visibility
     const notesPath = path.join(this.rootDir, '.solvent_notes.md');
     const note = `\n### [MEMORY DEPRECATED] ${new Date().toLocaleDateString()}\n**ID:** ${memoryId}\n**Reason:** ${reason}\n${replacementId ? `**Superseded By:** ${replacementId}` : ''}\n---\n`;
-    await fs.appendFile(notesPath, note).catch(() => {});
+    await fs.appendFile(notesPath, note).catch(e => logger.warn('[ToolService] Note append failed', e));
 
     return {
       status: 'success',
@@ -206,21 +259,21 @@ export class ToolService {
 
   private async captureUI() {
     const uploadDir = path.join(this.rootDir, 'backend/uploads');
-    
+
     // 1. Maintain Rolling Cache (Keep only last 3)
     try {
       const files = await fs.readdir(uploadDir);
       const captures = files
         .filter(f => f.startsWith('ui_capture_'))
         .map(f => ({ name: f, time: fs.stat(path.join(uploadDir, f)).then(s => s.mtimeMs) }));
-      
+
       const resolvedCaptures = await Promise.all(captures.map(async c => ({ ...c, time: await c.time })));
       resolvedCaptures.sort((a, b) => b.time - a.time);
 
       if (resolvedCaptures.length >= 3) {
         const toDelete = resolvedCaptures.slice(2); // Keep current + 2 previous
         for (const file of toDelete) {
-          await fs.unlink(path.join(uploadDir, file.name)).catch(() => {});
+          await fs.unlink(path.join(uploadDir, file.name)).catch(e => logger.debug('[ToolService] Cache cleanup failed', e));
         }
       }
     } catch (e) {
@@ -230,12 +283,12 @@ export class ToolService {
     const fileName = `ui_capture_${Date.now()}.png`;
     const filePath = path.join(uploadDir, fileName);
     await fs.mkdir(uploadDir, { recursive: true });
-    
+
     await screenshot({ filename: filePath });
     const base64 = await fs.readFile(filePath, 'base64');
-    
-    return { 
-      path: filePath, 
+
+    return {
+      path: filePath,
       base64: `data:image/png;base64,${base64}`,
       message: "UI state captured. Rolling cache maintained (last 3 kept)."
     };
@@ -282,14 +335,86 @@ export class ToolService {
     }));
   }
 
-  private async runShell(command: string) {
-    // Safety check: Basic prevention of catastrophic commands
-    const forbidden = ['rm -rf /', 'mkfs', 'dd'];
-    if (forbidden.some(f => command.includes(f))) {
-      throw new Error("Command rejected by security policy.");
+  /**
+   * Executes a shell command with security restrictions.
+   * 
+   * Security measures:
+   * 1. Uses explicit allowlist of permitted command prefixes (not a denylist)
+   * 2. Blocks dangerous commands (rm -rf, mkfs, dd, sudo, etc.)
+   * 3. Uses spawn with argument array to avoid shell interpolation
+   * 4. Sets NO_COLOR=1 environment variable
+   * 5. Restricts working directory to rootDir
+   * 
+   * @param command - The command to execute
+   * @returns Promise resolving to stdout and stderr
+   * @throws {Error} If command is not allowed or execution fails
+   */
+  private async runShell(command: string): Promise<{ stdout: string; stderr: string }> {
+    // Check if arbitrary shell execution is explicitly enabled
+    const allowArbitraryShell = process.env.SOLVENT_ALLOW_SHELL === 'true';
+    
+    if (!allowArbitraryShell) {
+      // Security: Check against allowlist
+      const normalizedCommand = command.trim().toLowerCase();
+
+      // First, check for dangerous commands (always blocked)
+      for (const dangerous of DANGEROUS_COMMANDS) {
+        if (normalizedCommand.includes(dangerous.toLowerCase())) {
+          throw new Error(
+            `Command rejected by security policy: Contains dangerous pattern '${dangerous}'. Set SOLVENT_ALLOW_SHELL=true to enable arbitrary command execution (not recommended).`
+          );
+        }
+      }
+
+      // Check if command starts with an allowed prefix
+      const isAllowed = ALLOWED_COMMAND_PREFIXES.some(prefix =>
+        normalizedCommand.startsWith(prefix.toLowerCase())
+      );
+
+      if (!isAllowed) {
+        throw new Error(
+          `Command rejected by security policy: '${command.substring(0, 50)}${command.length > 50 ? '...' : ''}'. Only allowed commands: ${ALLOWED_COMMAND_PREFIXES.join(', ')}. Set SOLVENT_ALLOW_SHELL=true to enable arbitrary command execution (not recommended).`
+        );
+      }
     }
-    const { stdout, stderr } = await execPromise(command, { cwd: this.rootDir });
-    return { stdout, stderr };
+    
+    // Parse command into executable and arguments for spawn
+    // This avoids shell interpolation vulnerabilities
+    const parts = command.trim().split(/\s+/);
+    const executable = parts[0];
+    const args = parts.slice(1);
+    
+    return new Promise((resolve, reject) => {
+      const child = spawn(executable, args, {
+        cwd: this.rootDir,
+        env: { ...process.env, NO_COLOR: '1' },
+        shell: false, // Security: Never use shell when spawning
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      child.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      child.on('error', (err) => {
+        reject(new Error(`Command execution failed: ${err.message}`));
+      });
+      
+      child.on('close', (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr });
+        } else {
+          reject(new Error(`Command exited with code ${code}\n${stderr}`));
+        }
+      });
+    });
   }
 }
 
