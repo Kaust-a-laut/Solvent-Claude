@@ -4,6 +4,7 @@ import { AIProvider, ChatMessage, CompletionOptions } from '../types/ai';
 import { toolService } from './toolService';
 import { getGeminiTools } from '../constants/tools';
 import { logger } from '../utils/logger';
+import { extractImageFromDataUrl, normalizeMessagesForGemini } from '../utils/messageUtils';
 
 export class GeminiService implements AIProvider {
   readonly name = 'gemini';
@@ -27,16 +28,15 @@ export class GeminiService implements AIProvider {
 
   async generateChatCompletion(messages: ChatMessage[], options: CompletionOptions): Promise<string> {
     const { model: modelName, shouldSearch, temperature = 0.7, maxTokens = 2048, apiKey } = options;
-    
-    const genAI = this.getGenAI(apiKey);
 
+    const genAI = this.getGenAI(apiKey);
     const tools: any[] = this.getToolDefinitions();
 
-    const modelConfig: any = { 
+    const modelConfig: any = {
       model: modelName,
       tools,
-      generationConfig: { 
-        temperature, 
+      generationConfig: {
+        temperature,
         maxOutputTokens: maxTokens,
         ...(options.jsonMode ? { responseMimeType: 'application/json' } : {})
       }
@@ -44,14 +44,11 @@ export class GeminiService implements AIProvider {
 
     const model = genAI.getGenerativeModel(modelConfig);
 
-    const history = messages.slice(0, -1).map(m => ({
-      role: (m.role === 'user' || m.role === 'system') ? 'user' : 'model',
-      parts: [{ text: m.content }]
-    }));
-
+    // Use shared message normalization
+    const history = normalizeMessagesForGemini(messages.slice(0, -1));
     const chat = model.startChat({ history });
     const lastMessage = messages[messages.length - 1].content;
-    
+
     try {
       let result = await chat.sendMessage(lastMessage);
       let response = await result.response;
@@ -60,7 +57,7 @@ export class GeminiService implements AIProvider {
       // Handle Tool Calls (Recursive)
       while (call && call.functionCall) {
         const toolResult = await toolService.executeTool(call.functionCall.name, call.functionCall.args);
-        
+
         let messagePart: any = {
           functionResponse: {
             name: call.functionCall.name,
@@ -70,14 +67,14 @@ export class GeminiService implements AIProvider {
 
         // If it was a UI capture, inject the image into the next turn for visual reasoning
         if (call.functionCall.name === 'capture_ui' && toolResult.base64) {
-          const matches = toolResult.base64.match(/^data:(.+);base64,(.+)$/);
-          if (matches) {
+          const imageInfo = extractImageFromDataUrl(toolResult.base64);
+          if (imageInfo) {
             messagePart = [
               messagePart,
               {
                 inlineData: {
-                  data: matches[2],
-                  mimeType: matches[1]
+                  data: imageInfo.data,
+                  mimeType: imageInfo.mimeType
                 }
               },
               { text: "Above is the screenshot I just captured. Analyze it to verify the UI state." }
@@ -99,9 +96,9 @@ export class GeminiService implements AIProvider {
 
   async *generateChatStream(messages: ChatMessage[], options: CompletionOptions): AsyncGenerator<string> {
     const { model: modelName, shouldSearch, temperature = 0.7, maxTokens = 2048 } = options;
-    
+
     const genAI = this.getGenAI();
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
         temperature,
@@ -109,11 +106,8 @@ export class GeminiService implements AIProvider {
       }
     });
 
-    const history = messages.slice(0, -1).map(m => ({
-      role: (m.role === 'user' || m.role === 'system') ? 'user' : 'model',
-      parts: [{ text: m.content }]
-    }));
-
+    // Use shared message normalization
+    const history = normalizeMessagesForGemini(messages.slice(0, -1));
     const chat = model.startChat({ history });
     const lastMessage = messages[messages.length - 1].content;
     const result = await chat.sendMessageStream(lastMessage);
@@ -126,7 +120,7 @@ export class GeminiService implements AIProvider {
   async generateVisionContent(prompt: string, imageParts: any[], options?: any) {
     const { model: modelName, temperature = 0.7, maxTokens = 2048, apiKey } = options || {};
     const genAI = this.getGenAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: modelName || 'gemini-2.0-flash',
       generationConfig: {
         temperature,
@@ -148,7 +142,7 @@ export class GeminiService implements AIProvider {
     const response = await result.response;
     const parts = response.candidates?.[0]?.content?.parts;
     const imagePart = parts?.find(part => part.inlineData);
-    
+
     if (imagePart && imagePart.inlineData) {
       logger.info(`[Gemini] Image generated successfully. MIME: ${imagePart.inlineData.mimeType}`);
       return {

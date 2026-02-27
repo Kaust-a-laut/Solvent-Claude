@@ -1,20 +1,16 @@
 import ollama from 'ollama';
 import { AIProvider, ChatMessage, CompletionOptions } from '../types/ai';
+import { normalizeMessagesForOllama } from '../utils/messageUtils';
 
 export class OllamaService implements AIProvider {
   readonly name = 'ollama';
 
   async generateChatCompletion(messages: ChatMessage[], options: CompletionOptions): Promise<string> {
+    const normalizedMessages = normalizeMessagesForOllama(messages);
+    
     const response = await ollama.chat({
       model: options.model,
-      messages: messages.map(m => {
-        const msg: any = { role: m.role, content: m.content };
-        if (m.image) {
-          const matches = m.image.match(/^data:(.+);base64,(.+)$/);
-          if (matches) msg.images = [matches[2]];
-        }
-        return msg;
-      }),
+      messages: normalizedMessages,
       stream: false,
       options: {
         temperature: options.temperature,
@@ -29,16 +25,11 @@ export class OllamaService implements AIProvider {
   }
 
   async *generateChatStream(messages: ChatMessage[], options: CompletionOptions): AsyncGenerator<string> {
+    const normalizedMessages = normalizeMessagesForOllama(messages);
+    
     const response = await ollama.chat({
       model: options.model,
-      messages: messages.map(m => {
-        const msg: any = { role: m.role, content: m.content };
-        if (m.image) {
-          const matches = m.image.match(/^data:(.+);base64,(.+)$/);
-          if (matches) msg.images = [matches[2]];
-        }
-        return msg;
-      }),
+      messages: normalizedMessages,
       stream: true,
       options: {
         temperature: options.temperature,

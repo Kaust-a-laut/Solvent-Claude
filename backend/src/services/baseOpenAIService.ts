@@ -3,6 +3,7 @@ import { AIProvider, ChatMessage, CompletionOptions } from '../types/ai';
 import { toolService } from './toolService';
 import { getOpenAITools } from '../constants/tools';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 /**
  * Abstract base class for OpenAI-compatible providers (Groq, DeepSeek, OpenRouter, etc.)
@@ -69,6 +70,7 @@ export abstract class BaseOpenAIService implements AIProvider {
               'Content-Type': 'application/json',
               ...(this.getExtraHeaders?.() || {})
             },
+            timeout: config.AI_PROVIDER_TIMEOUT_MS ?? 120_000,
             signal: options.signal
           }
         );
