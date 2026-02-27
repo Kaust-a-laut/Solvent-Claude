@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 
 export class FileService {
@@ -28,6 +27,7 @@ export class FileService {
       
       if (mimeType === 'application/pdf' || ext === '.pdf') {
         const dataBuffer = await fs.readFile(filePath);
+        const { default: pdf } = await import('pdf-parse');
         const data = await (pdf as any)(dataBuffer);
         return data.text;
       } 

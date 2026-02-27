@@ -2,7 +2,7 @@ import { AIProviderFactory } from './aiProviderFactory';
 import { WaterfallService } from './waterfallService';
 import { contextService } from './contextService';
 import { ChatRequestData, ChatMessage, CompletionOptions } from '../types/ai';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import { SolventError } from '../utils/errors';

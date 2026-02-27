@@ -2,8 +2,7 @@ import { Router } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import multer from 'multer';
-import { v4 as uuidv4 } from 'uuid';
-import pdf from 'pdf-parse';
+
 import mammoth from 'mammoth';
 
 const router = Router();
@@ -47,6 +46,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     // Extract text content based on file type
     if (extension === '.pdf') {
       const dataBuffer = await fs.readFile(filePath);
+      const { default: pdf } = await import('pdf-parse');
       const data = await (pdf as any)(dataBuffer);
       content = data.text;
     } else if (['.docx', '.doc'].includes(extension)) {
