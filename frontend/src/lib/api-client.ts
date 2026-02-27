@@ -19,11 +19,29 @@ let cachedSecret: string | null = null;
 
 async function getSecret() {
   if (cachedSecret) return cachedSecret;
-  if (window.electron?.getSessionSecret) {
-    cachedSecret = await window.electron.getSessionSecret();
-    return cachedSecret;
+
+  try {
+    if (window.electron?.getSessionSecret) {
+      const secret = await window.electron.getSessionSecret();
+      if (secret) {
+        cachedSecret = secret;
+        console.log('[API] Using Electron session secret');
+        return cachedSecret;
+      }
+    }
+  } catch (err) {
+    console.warn('[API] Failed to get Electron session secret:', err);
   }
-  return 'solvent_default_secure_pass_2026'; // Fallback for pure web dev mode
+
+  // Fallback for pure web dev mode only — must match backend BACKEND_INTERNAL_SECRET
+  const isProd = (import.meta as any).env?.PROD === true;
+  if (isProd) {
+    console.error('[API] FATAL: No session secret available in production. Set BACKEND_INTERNAL_SECRET.');
+    throw new Error('No session secret available in production mode.');
+  }
+  cachedSecret = 'solvent_dev_insecure_default_32ch';
+  console.warn('[API] DEV MODE: Using fallback session secret. Do not use in production.');
+  return cachedSecret;
 }
 
 export async function fetchWithRetry(url: string, options: RequestOptions = {}): Promise<any> {
@@ -53,7 +71,15 @@ export async function fetchWithRetry(url: string, options: RequestOptions = {}):
         } catch {
           errorBody = await response.text();
         }
-        
+
+        // Special handling for auth errors
+        if (response.status === 401) {
+          console.error('[API] Authorization failed. Secret or configuration issue.', {
+            status: response.status,
+            error: errorBody
+          });
+        }
+
         const error = new APIError(
           `Request failed with status ${response.status}`,
           response.status,
@@ -65,7 +91,7 @@ export async function fetchWithRetry(url: string, options: RequestOptions = {}):
         if (response.status >= 400 && response.status < 500) {
           throw error;
         }
-        
+
         throw error;
       }
       

@@ -13,9 +13,20 @@ export interface SupervisorState {
 export class SupervisorService {
   private io: Server | null = null;
   private isProcessing = false;
+  private thinkDepth = 0;
+  private readonly MAX_DEPTH = 2;
+  private readonly TOOL_BUDGET = 5;
+  private toolCallsInCycle = 0;
 
   setIO(io: Server) {
     this.io = io;
+  }
+
+  incrementToolBudget() {
+    if (this.toolCallsInCycle >= this.TOOL_BUDGET) {
+      throw new Error(`Overseer tool budget exceeded (${this.TOOL_BUDGET} calls per cycle).`);
+    }
+    this.toolCallsInCycle++;
   }
 
   async supervise(noteContent: string, currentGraph: any) {
@@ -113,6 +124,164 @@ export class SupervisorService {
   emitEvent(event: string, payload: any) {
     if (this.io) {
       this.io.emit(event, payload);
+    }
+  }
+
+  /**
+   * Builds a rich live-context string from all 4 signal sources:
+   * notepad content, recent messages, VectorService memory, and mission status.
+   */
+  private async buildLiveContext(
+    activity: string,
+    signals: {
+      notepadContent?: string;
+      recentMessages?: Array<{ role: string; content: string }>;
+      missionId?: string;
+      focus?: string;
+      [key: string]: unknown;
+    }
+  ): Promise<string> {
+    const parts: string[] = [];
+
+    // Signal 1: Active notepad / directives
+    if (signals.notepadContent && signals.notepadContent.trim().length > 10) {
+      parts.push(`[ACTIVE DIRECTIVES / NOTEPAD]\n${signals.notepadContent.trim().slice(0, 1200)}`);
+    }
+
+    // Signal 2: Recent conversation messages (last 8)
+    if (signals.recentMessages && signals.recentMessages.length > 0) {
+      const recent = signals.recentMessages.slice(-8);
+      const msgText = recent
+        .map(m => `${m.role.toUpperCase()}: ${String(m.content).slice(0, 300)}`)
+        .join('\n');
+      parts.push(`[RECENT CONVERSATION]\n${msgText}`);
+    }
+
+    // Signal 3: VectorService memory — crystallized rules + past decisions
+    try {
+      const searchQuery = signals.focus || signals.notepadContent || activity;
+      const memories = await vectorService.search(String(searchQuery).slice(0, 500), 15);
+      const relevantMemories = memories.filter(m => m.score > 0.55);
+      if (relevantMemories.length > 0) {
+        const memText = relevantMemories
+          .map(m => `[${String(m.metadata.type || 'memory').toUpperCase()}]: ${m.metadata.text}`)
+          .join('\n');
+        parts.push(`[RELEVANT MEMORY]\n${memText}`);
+      }
+    } catch {
+      // Vector search is non-critical; continue without it
+    }
+
+    // Signal 4: Active mission context (if provided)
+    if (signals.missionId) {
+      parts.push(`[ACTIVE MISSION ID]: ${signals.missionId}`);
+    }
+    if (signals.result) {
+      const missionSummary = typeof signals.result === 'object'
+        ? JSON.stringify(signals.result).slice(0, 600)
+        : String(signals.result).slice(0, 600);
+      parts.push(`[MISSION RESULT SUMMARY]\n${missionSummary}`);
+    }
+
+    return parts.length > 0 ? parts.join('\n\n') : `Activity: ${activity}`;
+  }
+
+  /**
+   * THE OVERSEER BRAIN: Autonomous reasoning loop.
+   * Accepts optional live signals for context enrichment.
+   */
+  async think(context: {
+    activity: string;
+    data?: {
+      notepadContent?: string;
+      recentMessages?: Array<{ role: string; content: string }>;
+      missionId?: string;
+      focus?: string;
+      [key: string]: unknown;
+    };
+  }) {
+    if (this.isProcessing) return;
+
+    // GUARD: Recursion depth
+    if (this.thinkDepth >= this.MAX_DEPTH) {
+      logger.warn(`[Overseer] Max recursion depth (${this.MAX_DEPTH}) reached. Halting.`);
+      return;
+    }
+
+    this.isProcessing = true;
+    this.thinkDepth++;
+    this.toolCallsInCycle = 0;
+
+    try {
+      const { toolService } = require('./toolService');
+      const gemini = await AIProviderFactory.getProvider('gemini');
+
+      // 1. Build enriched live context from all signal sources
+      const liveContext = await this.buildLiveContext(context.activity, context.data || {});
+
+      // 2. Formulate the Overseer's internal state
+      const prompt = `You are the SOLVENT AI OVERSEER.
+      You are the all-knowing decision engine assistant for this project.
+      You have access to live context from notepad directives, recent conversation, crystallized memory, and mission results.
+
+      TRIGGER: ${context.activity}
+
+      LIVE CONTEXT:
+      ${liveContext}
+
+      YOUR CAPABILITIES:
+      - You have full access to Vector Memory.
+      - You can execute tools via the system (File I/O, Shell, Tests).
+      - You can proactively intervene if the user deviates from architecture.
+
+      TASK:
+      Analyze the current state based on the live context above. If something is missing, risky, or crystallizable, formulate a decision.
+      Be concise and specific — your response goes directly to the user in their Command Center.
+
+      RESPONSE FORMAT (JSON):
+      {
+        "decision": "Your high-level conclusion",
+        "intervention": {
+          "needed": boolean,
+          "type": "warning|suggestion|action",
+          "message": "Direct message to the user",
+          "toolToExecute": { "name": "tool_name", "args": {} } (OR null)
+        },
+        "crystallize": { "content": "Knowledge to save", "type": "architectural_decision|rule" } (OR null),
+        "mentalMapUpdate": "Changes to reflect in the knowledge graph"
+      }`;
+
+      const response = await gemini.complete([
+        { role: 'user', content: prompt }
+      ], { model: 'gemini-2.0-flash', temperature: 0.1 });
+
+      const result = this.parseResponse(response);
+
+      if (result) {
+        // Execute Tool if Overseer decides it's necessary
+        if (result.intervention?.toolToExecute) {
+          logger.info(`[Overseer] Executing autonomous tool: ${result.intervention.toolToExecute.name}`);
+          await toolService.executeTool(result.intervention.toolToExecute.name, result.intervention.toolToExecute.args);
+        }
+
+        // Notify UI via Socket
+        this.emitEvent('OVERSEER_DECISION', result);
+
+        // Auto-Crystallize
+        if (result.crystallize?.content) {
+          await toolService.executeTool('crystallize_memory', {
+            content: result.crystallize.content,
+            type: result.crystallize.type,
+            tags: ['overseer_decision']
+          });
+        }
+      }
+
+    } catch (error) {
+      logger.error('[Overseer] Autonomous reasoning failed', error);
+    } finally {
+      this.thinkDepth--;
+      this.isProcessing = false;
     }
   }
 

@@ -57,6 +57,18 @@ export class TaskService {
     return queue;
   }
 
+  /**
+   * Lazily creates and caches a QueueEvents instance for the given queue.
+   * QueueEvents requires a dedicated Redis connection per BullMQ design.
+   */
+  getQueueEvents(queueName: TaskQueue): QueueEvents {
+    if (!this.queueEvents.has(queueName)) {
+      const qe = new QueueEvents(queueName, { connection: this.redis.duplicate() });
+      this.queueEvents.set(queueName, qe);
+    }
+    return this.queueEvents.get(queueName)!;
+  }
+
   async dispatchJob(queueName: TaskQueue, jobName: string, payload: TaskPayload, opts?: any): Promise<string> {
     const queue = this.getQueue(queueName);
     const job = await queue.add(jobName, payload, opts);

@@ -9,7 +9,7 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default('3001'),
   GEMINI_API_KEY: z.string().optional(),
   // Provider configuration
-  DEFAULT_PROVIDER: z.string().default('gemini'),
+  DEFAULT_PROVIDER: z.string().default('groq'),
   // Optional keys
   SERPER_API_KEY: z.string().optional(),
   DEEPSEEK_API_KEY: z.string().optional(),
@@ -19,8 +19,8 @@ const envSchema = z.object({
   OLLAMA_HOST: z.string().default('http://127.0.0.1:11434'),
   // Feature flags
   ENABLE_OLLAMA: z.string().transform(v => v === 'true').default('true'),
-  // Security
-  BACKEND_INTERNAL_SECRET: z.string().default('solvent_dev_insecure_default'),
+  // Security — must be ≥32 chars in production; dev default meets the minimum
+  BACKEND_INTERNAL_SECRET: z.string().min(32).default('solvent_dev_insecure_default_32ch'),
   // Memory System
   MEMORY_CACHE_SIZE: z.string().transform(Number).default('1000'),
   MEMORY_MAX_ENTRIES: z.string().transform(Number).default('1500'),
