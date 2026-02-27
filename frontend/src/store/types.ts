@@ -37,6 +37,32 @@ export interface Message {
   provenance?: ContextProvenance; // Tracking where the AI drew its context from
 }
 
+export interface OverseerDecision {
+  id: string;
+  decision: string;
+  intervention?: {
+    needed: boolean;
+    type: 'warning' | 'suggestion' | 'action';
+    message: string;
+    toolToExecute?: { name: string; args: Record<string, unknown> } | null;
+  };
+  crystallize?: { content: string; type: string } | null;
+  mentalMapUpdate?: string;
+  timestamp: number;
+  trigger?: string; // the activity that fired this
+}
+
+export interface ActiveMission {
+  jobId: string;
+  goal: string;
+  missionType: string;
+  status: 'queued' | 'active' | 'complete' | 'failed';
+  progress: number;
+  result?: unknown;
+  error?: string;
+  startedAt: number;
+}
+
 export interface GraphNode {
   id: string;
   title: string;

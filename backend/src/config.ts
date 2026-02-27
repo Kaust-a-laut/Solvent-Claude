@@ -11,7 +11,7 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default('3001'),
   GEMINI_API_KEY: z.string().optional(),
   // Provider configuration
-  DEFAULT_PROVIDER: z.string().default('gemini'),
+  DEFAULT_PROVIDER: z.string().default('groq'),
   // Optional keys
   SERPER_API_KEY: z.string().optional(),
   DEEPSEEK_API_KEY: z.string().optional(),

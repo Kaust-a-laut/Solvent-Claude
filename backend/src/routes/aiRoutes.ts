@@ -63,6 +63,18 @@ router.get('/tasks/:jobId', async (req, res) => {
   }
 });
 
+// Manual Overseer Trigger Endpoint
+// Allows the Command Center to fire a live-context think() cycle on demand
+router.post('/overseer/trigger', async (req, res) => {
+  const { focus, notepadContent, recentMessages } = req.body;
+  // Fire-and-forget — respond immediately, let think() run async
+  supervisorService.think({
+    activity: 'manual_trigger',
+    data: { focus, notepadContent, recentMessages }
+  }).catch(() => {});
+  res.json({ status: 'triggered', message: 'Overseer is analyzing...' });
+});
+
 // Plugin Discovery Endpoint
 router.get('/plugins', async (req, res) => {
   try {

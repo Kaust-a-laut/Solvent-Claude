@@ -10,16 +10,12 @@ import { socket } from '../lib/socket';
 
 export const FloatingNotepad = () => {
 
-  const { 
-
-    notepadContent, setNotepadContent, deviceInfo, isProcessing, 
-
+  const {
+    notepadContent, setNotepadContent, deviceInfo, isProcessing,
     showKnowledgeMap, setShowKnowledgeMap, graphNodes, graphEdges,
-
     addGraphNode, addGraphEdge, removeGraphNode, setSupervisorInsight,
-
+    addOverseerDecision, upsertMission, addActivity,
     isCommandCenterOpen: isOpen, setIsCommandCenterOpen: setIsOpen
-
   } = useAppStore();
 
   const [isMinimized, setIsMinimized] = useState(false);
@@ -237,21 +233,55 @@ export const FloatingNotepad = () => {
 
       socket.on('SUPERVISOR_UPDATE', handleSupervisorUpdate);
 
-
-
       return () => {
-
-
-
         socket.off('SUPERVISOR_UPDATE', handleSupervisorUpdate);
-
-
-
       };
 
-
-
     }, [addGraphNode, addGraphEdge, removeGraphNode, setSupervisorInsight]);
+
+  // Overseer decisions, nudges, and mission progress events
+  useEffect(() => {
+    const handleOverseerDecision = (data: any) => {
+      addOverseerDecision({ ...data, trigger: data.trigger || 'system' });
+      if (data.intervention?.message) {
+        setSupervisorInsight(data.intervention.message);
+      }
+      addActivity({ type: 'overseer', message: data.decision?.slice(0, 80) || 'Overseer decision', source: 'Overseer' });
+    };
+
+    const handleNudge = (data: { message: string }) => {
+      setSupervisorInsight(data.message);
+      addActivity({ type: 'supervisor', message: data.message?.slice(0, 80), source: 'Overseer Nudge' });
+    };
+
+    const handleMissionProgress = (data: { jobId: string; progress: number }) => {
+      upsertMission({ jobId: data.jobId, progress: data.progress, status: 'active' });
+    };
+
+    const handleMissionComplete = (data: { jobId: string; result: unknown }) => {
+      upsertMission({ jobId: data.jobId, status: 'complete', progress: 100, result: data.result });
+      addActivity({ type: 'success', message: 'Mission completed', source: 'Orchestration' });
+    };
+
+    const handleMissionFailed = (data: { jobId: string; error: string }) => {
+      upsertMission({ jobId: data.jobId, status: 'failed', error: data.error });
+      addActivity({ type: 'warning', message: `Mission failed: ${data.error?.slice(0, 60)}`, source: 'Orchestration' });
+    };
+
+    socket.on('OVERSEER_DECISION', handleOverseerDecision);
+    socket.on('supervisor-nudge', handleNudge);
+    socket.on('MISSION_PROGRESS', handleMissionProgress);
+    socket.on('MISSION_COMPLETE', handleMissionComplete);
+    socket.on('MISSION_FAILED', handleMissionFailed);
+
+    return () => {
+      socket.off('OVERSEER_DECISION', handleOverseerDecision);
+      socket.off('supervisor-nudge', handleNudge);
+      socket.off('MISSION_PROGRESS', handleMissionProgress);
+      socket.off('MISSION_COMPLETE', handleMissionComplete);
+      socket.off('MISSION_FAILED', handleMissionFailed);
+    };
+  }, [addOverseerDecision, setSupervisorInsight, upsertMission, addActivity]);
 
 
 

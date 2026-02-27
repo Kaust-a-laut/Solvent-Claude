@@ -10,11 +10,14 @@ import path from 'path';
 import fileRoutes from './routes/fileRoutes';
 import aiRoutes from './routes/aiRoutes';
 import debugRoutes from './routes/debugRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { supervisorService } from './services/supervisorService';
 import { pluginManager } from './services/pluginManager';
+import { settingsService } from './services/settingsService';
+import { taskService, TaskQueue } from './services/taskService';
 
 const app = express();
 const httpServer = createServer(app);
@@ -39,13 +42,25 @@ io.on('connection', (socket) => {
 
   socket.on('SYNC_NOTES', async (data) => {
     try {
-      // Trigger Overseer Logic
       await supervisorService.supervise(data.content, data.graph);
+      // Proactive Overseer think() — fire-and-forget with notepad as primary signal
+      supervisorService.think({
+        activity: 'notepad_change',
+        data: { notepadContent: data.content }
+      }).catch(() => {});
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       console.error('[Socket] SYNC_NOTES handler error:', err);
       socket.emit('error', { message: err.message, type: 'SYNC_NOTES_FAILED' });
     }
+  });
+
+  // Memory crystallization event → trigger Overseer awareness
+  socket.on('CRYSTALLIZE_MEMORY', (data) => {
+    supervisorService.think({
+      activity: 'memory_crystallized',
+      data: { focus: data.content, notepadContent: data.content }
+    }).catch(() => {});
   });
 
   socket.on('disconnect', () => {
@@ -54,6 +69,33 @@ io.on('connection', (socket) => {
 });
 
 supervisorService.setIO(io);
+
+// --- Mission Progress Bridge: BullMQ → Socket.io ---
+// Workers can't access Socket.io directly; QueueEvents bridges the gap
+try {
+  const orchestrationEvents = taskService.getQueueEvents(TaskQueue.ORCHESTRATION);
+
+  orchestrationEvents.on('progress', ({ jobId, data }: { jobId: string; data: unknown }) => {
+    io.emit('MISSION_PROGRESS', { jobId, progress: data });
+  });
+
+  orchestrationEvents.on('completed', ({ jobId, returnvalue }: { jobId: string; returnvalue: unknown }) => {
+    io.emit('MISSION_COMPLETE', { jobId, result: returnvalue });
+    // Overseer: analyze the completed mission in context
+    supervisorService.think({
+      activity: 'mission_completed',
+      data: { missionId: jobId, result: returnvalue }
+    }).catch(() => {});
+  });
+
+  orchestrationEvents.on('failed', ({ jobId, failedReason }: { jobId: string; failedReason: string }) => {
+    io.emit('MISSION_FAILED', { jobId, error: failedReason });
+  });
+
+  console.log('[Server] Mission progress bridge initialized');
+} catch (err) {
+  console.warn('[Server] Mission progress bridge unavailable (Redis may not be running):', err);
+}
 
 // --- Global Middleware ---
 app.use(cors(corsOptions));
@@ -85,6 +127,8 @@ app.use('/files', express.static(uploadDir));
 
 const API_SECRET = config.BACKEND_INTERNAL_SECRET;
 
+console.log(`[Server] API_SECRET initialized: ${API_SECRET === 'solvent_dev_insecure_default' ? '✓ Using default (dev mode)' : '✓ Using custom secret'}`);
+
 // Security Middleware
 app.use((req, res, next) => {
   // Skip secret check for local static images or health checks if needed
@@ -92,7 +136,9 @@ app.use((req, res, next) => {
 
   const clientSecret = req.headers['x-solvent-secret'];
   if (clientSecret !== API_SECRET) {
-    console.warn(`[SECURITY] Unauthorized request to ${req.path} from ${req.ip}. Header: ${clientSecret}`);
+    console.warn(`[SECURITY] Unauthorized request to ${req.path} from ${req.ip}`);
+    console.warn(`[SECURITY] Expected secret: ${API_SECRET}`);
+    console.warn(`[SECURITY] Received secret: ${clientSecret || '(none)'}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid session secret' });
   }
   next();
@@ -102,6 +148,7 @@ app.use((req, res, next) => {
 app.use('/api/v1', aiRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/debug', debugRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // --- Error Handling Middleware ---
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -146,6 +193,14 @@ app.get('/health', (req, res) => {
 
 // Start server asynchronously
 async function startServer(): Promise<void> {
+  // Initialize settings before plugins
+  try {
+    await settingsService.initialize();
+    console.log('[Server] Settings service initialized successfully');
+  } catch (error) {
+    console.error('[Server] Failed to initialize settings service:', error);
+  }
+
   // Wait for plugins to initialize before accepting requests
   await initializePlugins();
   

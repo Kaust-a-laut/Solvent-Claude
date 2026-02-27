@@ -35,12 +35,12 @@ let cachedSecret: string | null = null;
  */
 async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
-  
+
   if (window.electron?.getSessionSecret) {
     cachedSecret = await window.electron.getSessionSecret();
     return cachedSecret;
   }
-  
+
   // Pure web mode without Electron is not supported for security reasons
   throw new Error(
     'Authentication unavailable: Solvent requires the Electron environment. ' +
