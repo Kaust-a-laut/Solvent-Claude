@@ -26,12 +26,14 @@ let cachedSecret: string | null = null;
 
 /**
  * Retrieves the session secret for authenticating with the backend.
- * 
- * In Electron mode, this is provided by the Electron preload script.
- * In pure web mode (without Electron), authentication is unavailable and
- * the backend will reject requests - this mode is not supported.
- * 
- * @throws {Error} When running in pure web mode without Electron support
+ *
+ * Priority order:
+ * 1. Electron preload: `window.electron.getSessionSecret()`
+ * 2. Env override: `VITE_BACKEND_SECRET` in frontend/.env
+ * 3. Dev auto-fallback: uses backend's built-in dev default ('solvent_dev_insecure_default')
+ *    when `import.meta.env.DEV` is true — no .env file required for local development
+ *
+ * @throws {Error} Only in production builds without Electron
  */
 async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
@@ -50,10 +52,19 @@ async function getSecret(): Promise<string> {
     return cachedSecret;
   }
 
-  // No auth available
+  // Auto dev-mode fallback: use the backend's built-in dev default.
+  // The backend defaults to 'solvent_dev_insecure_default' when BACKEND_INTERNAL_SECRET
+  // is not set in its environment. This lets the full app work in browser dev mode
+  // (npm run dev) without any .env file setup.
+  // In production builds import.meta.env.DEV is false so this branch never runs.
+  if ((import.meta as any).env?.DEV) {
+    cachedSecret = 'solvent_dev_insecure_default';
+    return cachedSecret;
+  }
+
+  // No auth available (production browser without Electron)
   throw new Error(
-    'Authentication unavailable: Solvent requires the Electron environment. ' +
-    'For dev mode, set VITE_BACKEND_SECRET in frontend/.env matching your backend secret.'
+    'Authentication unavailable: Solvent requires the Electron environment.'
   );
 }
 
