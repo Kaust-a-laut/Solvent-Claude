@@ -1,0 +1,33 @@
+{
+  "providers": {
+    "gemini": {
+      "enabled": true,
+      "priority": 1
+    },
+    "groq": {
+      "enabled": true,
+      "priority": 2
+    },
+    "ollama": {
+      "enabled": true,
+      "priority": 3
+    },
+    "openrouter": {
+      "enabled": true,
+      "priority": 4
+    },
+    "huggingface": {
+      "enabled": true,
+      "priority": 5
+    },
+    "puter": {
+      "enabled": true,
+      "priority": 6
+    }
+  },
+  "defaultProvider": "gemini",
+  "temperature": 0.7,
+  "maxTokens": 4096,
+  "imageProvider": "gemini",
+  "globalProvider": "auto"
+}

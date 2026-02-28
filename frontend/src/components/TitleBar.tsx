@@ -1,23 +1,88 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Minus, Square, X, Hexagon, Command, 
-  Search, Sparkles, Settings, Activity, Shield, Bot, Terminal, Brain
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  Minus, Square, X,
+  Search, Settings, Brain, ExternalLink
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAppStore } from '../store/useAppStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export const TitleBar = () => {
-  const { setSettingsOpen, deviceInfo, isProcessing, isCommandCenterOpen, toggleCommandCenter, setCurrentMode } = useAppStore();
+  const {
+    setSettingsOpen, deviceInfo, isProcessing,
+    isCommandCenterOpen, toggleCommandCenter,
+    commandCenterPiPOpen, setCommandCenterPiPOpen,
+    setCurrentMode
+  } = useAppStore();
   const [isElectron, setIsElectron] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
+  const pipWindowRef = useRef<Window | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electron) {
       setIsElectron(true);
     }
   }, []);
+
+  // Cleanup poll on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const openCommandCenterPiP = useCallback(() => {
+    // Already have one open — try to focus it
+    if (pipWindowRef.current && !pipWindowRef.current.closed) {
+      pipWindowRef.current.focus();
+      return;
+    }
+
+    const url = window.location.origin + '?pip=notepad';
+    const pipWin = window.open(url, 'solvent-command-center', 'width=420,height=650');
+
+    if (pipWin) {
+      pipWindowRef.current = pipWin;
+      setCommandCenterPiPOpen(true);
+
+      // Poll to detect when user closes the popup
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => {
+        if (!pipWin || pipWin.closed) {
+          setCommandCenterPiPOpen(false);
+          pipWindowRef.current = null;
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      }, 1000);
+    } else {
+      // Popup blocked — fall back to inline
+      toggleCommandCenter();
+    }
+  }, [setCommandCenterPiPOpen, toggleCommandCenter]);
+
+  const handleCommandCenterClick = (e: React.MouseEvent) => {
+    // Shift+Click: open inline panel (FloatingNotepad)
+    if (e.shiftKey || e.altKey) {
+      toggleCommandCenter();
+      return;
+    }
+    // Default: open as detached PiP window
+    openCommandCenterPiP();
+  };
+
+  // Keyboard shortcut: Ctrl/Cmd+Shift+C
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        openCommandCenterPiP();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openCommandCenterPiP]);
 
   return (
     <div className={cn(
@@ -29,7 +94,7 @@ export const TitleBar = () => {
         <div className="flex items-center gap-3">
           <div className="relative group">
             <div className="absolute inset-0 bg-jb-orange/20 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div 
+            <div
               className="w-8 h-8 relative flex items-center justify-center cursor-pointer shrink-0 group-hover:rotate-12 transition-transform"
               onClick={() => setCurrentMode('home')}
             >
@@ -46,8 +111,8 @@ export const TitleBar = () => {
                      </filter>
                   </defs>
                   <path d="M38 20 L38 45 L18 82 Q15 88 22 88 L78 88 Q85 88 82 82 L62 45 L62 20 Z" fill="none" stroke="white" strokeWidth="2" strokeOpacity="0.15" />
-                  <motion.path 
-                     animate={{ 
+                  <motion.path
+                     animate={{
                        d: [
                          "M40 48 L25 80 Q23 83 27 83 L73 83 Q77 83 75 80 L60 48 Q58 45 50 45 Q42 45 40 48 Z",
                          "M40 50 L25 82 Q23 85 27 85 L73 85 Q77 85 75 82 L60 50 Q58 47 50 47 Q42 47 40 50 Z",
@@ -64,20 +129,24 @@ export const TitleBar = () => {
             <span className="text-[11px] font-[900] tracking-[0.25em] text-white uppercase leading-none">Solvent AI</span>
           </div>
         </div>
-        
+
         <div className="h-6 w-[1px] bg-white/10" />
 
-        <button 
-          onClick={toggleCommandCenter}
+        <button
+          onClick={handleCommandCenterClick}
           className={cn(
             "flex items-center gap-3 px-4 py-2 rounded-xl transition-all border group relative overflow-hidden app-no-drag",
-            isCommandCenterOpen 
-              ? "bg-jb-purple/20 border-jb-purple/40 text-jb-purple shadow-[0_0_20px_rgba(157,91,210,0.2)]" 
-              : "bg-white/5 border-white/5 text-slate-400 hover:text-white hover:border-white/10"
+            commandCenterPiPOpen
+              ? "bg-jb-orange/20 border-jb-orange/40 text-jb-orange shadow-[0_0_20px_rgba(251,146,60,0.2)]"
+              : isCommandCenterOpen
+                ? "bg-jb-purple/20 border-jb-purple/40 text-jb-purple shadow-[0_0_20px_rgba(157,91,210,0.2)]"
+                : "bg-white/5 border-white/5 text-slate-400 hover:text-white hover:border-white/10"
           )}
+          title={commandCenterPiPOpen ? "Command Center (Detached — click to focus)" : "Command Center (Shift+Click for inline)"}
         >
            <Brain size={14} className={cn(isProcessing && "animate-pulse")} />
            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Command Center</span>
+           {commandCenterPiPOpen && <ExternalLink size={10} className="text-jb-orange/60" />}
            {isProcessing && <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-jb-orange rounded-full animate-pulse" />}
         </button>
       </div>
@@ -89,9 +158,9 @@ export const TitleBar = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-jb-accent/10 via-jb-purple/10 to-jb-orange/10 rounded-xl blur-md opacity-0 group-focus-within:opacity-100 transition-opacity" />
               <div className="relative flex items-center bg-white/[0.03] border border-white/10 rounded-xl px-5 py-2 backdrop-blur-xl group-focus-within:border-white/20 transition-all">
                  <Search size={14} className="text-slate-500 mr-3" />
-            <input 
-              type="text" 
-              placeholder="Search // Command Solvent..." 
+            <input
+              type="text"
+              placeholder="Search // Command Solvent..."
               className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-white placeholder:text-slate-600"
             />
                  <div className="flex items-center gap-2">
@@ -108,7 +177,7 @@ export const TitleBar = () => {
       <div className="flex items-center gap-1 h-full min-w-[300px] justify-end app-no-drag">
         {/* Global Utilities */}
         <div className="flex items-center gap-1 pr-4">
-           <button 
+           <button
              onClick={() => setSettingsOpen(true)}
              className="p-2.5 rounded-xl text-slate-500 hover:text-white hover:bg-white/5 transition-all border border-transparent hover:border-white/5"
              title="System Settings"
@@ -120,14 +189,14 @@ export const TitleBar = () => {
         {isElectron && (
           <>
             <div className="h-4 w-[1px] bg-white/10 mx-2" />
-            <button 
+            <button
               onClick={() => window.electron?.minimize()}
               className="h-full w-12 flex items-center justify-center hover:bg-white/5 text-slate-500 hover:text-white transition-colors"
             >
               <Minus size={16} />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => {
                 window.electron?.maximize();
                 setIsMaximized(!isMaximized);
@@ -136,8 +205,8 @@ export const TitleBar = () => {
             >
               <Square size={14} />
             </button>
-            
-            <button 
+
+            <button
               onClick={() => window.electron?.close()}
               className="h-full w-12 flex items-center justify-center hover:bg-red-500 text-slate-500 hover:text-white transition-colors"
             >

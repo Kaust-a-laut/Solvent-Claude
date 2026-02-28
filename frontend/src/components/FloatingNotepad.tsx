@@ -15,7 +15,8 @@ export const FloatingNotepad = () => {
     showKnowledgeMap, setShowKnowledgeMap, graphNodes, graphEdges,
     addGraphNode, addGraphEdge, removeGraphNode, setSupervisorInsight,
     addOverseerDecision, upsertMission, addActivity,
-    isCommandCenterOpen: isOpen, setIsCommandCenterOpen: setIsOpen
+    isCommandCenterOpen: isOpen, setIsCommandCenterOpen: setIsOpen,
+    setCommandCenterPiPOpen
   } = useAppStore();
 
   const [isMinimized, setIsMinimized] = useState(false);
@@ -290,28 +291,18 @@ export const FloatingNotepad = () => {
 
 
         const openPiP = () => {
-
-
-
-  
-
-
-
           const url = window.location.origin + '?pip=notepad';
+          const pipWin = window.open(url, 'solvent-command-center', 'width=420,height=650');
 
-
-
-  
-
-
-
-          window.open(url, '_blank', 'width=400,height=600');
-
-
-
-  
-
-
+          if (pipWin) {
+            setCommandCenterPiPOpen(true);
+            const checkClosed = setInterval(() => {
+              if (!pipWin || pipWin.closed) {
+                setCommandCenterPiPOpen(false);
+                clearInterval(checkClosed);
+              }
+            }, 1000);
+          }
 
           setIsOpen(false);
 
@@ -403,8 +394,9 @@ export const FloatingNotepad = () => {
                <button onClick={handleSave} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors" title="Save to Project Memory">
                   <Save size={14} />
                </button>
-               <button onClick={openPiP} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors" title="Detach (PiP Mode)">
-                  <ExternalLink size={14} />
+               <button onClick={openPiP} className="flex items-center gap-1 px-2 py-1 rounded-lg border bg-jb-orange/10 border-jb-orange/30 text-jb-orange hover:bg-jb-orange/20 transition-all text-[8px] font-black uppercase tracking-wider" title="Detach as separate window">
+                  <ExternalLink size={10} />
+                  <span>Detach</span>
                </button>
                <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/5 rounded-lg text-slate-500 hover:text-white transition-colors">
                   {isMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}

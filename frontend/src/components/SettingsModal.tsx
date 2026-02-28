@@ -6,7 +6,7 @@ import {
   CheckCircle2, AlertCircle, Loader2, RefreshCw
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { API_BASE_URL } from '../lib/config';
+import { API_BASE_URL, BASE_URL } from '../lib/config';
 import { cn } from '../lib/utils';
 import { fetchWithRetry } from '../lib/api-client';
 
@@ -59,7 +59,8 @@ export const SettingsModal = () => {
     if (settingsOpen) {
       const checkHealth = async () => {
         try {
-          const health = await fetchWithRetry(`${API_BASE_URL}/health/services`);
+          const res = await fetch(`${API_BASE_URL}/health/services`);
+          const health = await res.json();
           setServiceHealth(health);
         } catch (e) {
           setServiceHealth({ ollama: 'disconnected' });
@@ -78,7 +79,8 @@ export const SettingsModal = () => {
   const fetchModels = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const data = await fetchWithRetry(`${API_BASE_URL}/models`);
+      const res = await fetch(`${API_BASE_URL}/models`);
+      const data = await res.json();
       setAvailableModels(prev => ({
         ...prev,
         ollama: data.ollama || [],
@@ -134,12 +136,14 @@ export const SettingsModal = () => {
     if (!key) return;
     setValidationStatus(prev => ({ ...prev, [provider]: 'loading' }));
     try {
-      await fetchWithRetry(`${API_BASE_URL}/chat`, {
+      // Use the dedicated validation endpoint (auth-exempt, makes real API call)
+      const res = await fetch(`${BASE_URL}/api/settings/providers/${provider}/validate-key`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, model: 'ping', messages: [{ role: 'user', content: 'hi' }], apiKeys: { [provider]: key }, maxTokens: 1 })
+        body: JSON.stringify({ apiKey: key })
       });
-      setValidationStatus(prev => ({ ...prev, [provider]: 'success' }));
+      const data = await res.json();
+      setValidationStatus(prev => ({ ...prev, [provider]: data.valid ? 'success' : 'error' }));
     } catch {
       setValidationStatus(prev => ({ ...prev, [provider]: 'error' }));
     }

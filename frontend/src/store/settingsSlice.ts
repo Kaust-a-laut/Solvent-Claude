@@ -27,6 +27,7 @@ export interface SettingsSlice {
   deviceInfo: DeviceInfo;
   apiKeys: Record<string, string>;
   isCommandCenterOpen: boolean;
+  commandCenterPiPOpen: boolean;
   browserHistory: string[];
   lastSearchResults: any | null;
   activities: any[];
@@ -56,6 +57,7 @@ export interface SettingsSlice {
   setApiKey: (provider: string, key: string) => void;
   setIsCommandCenterOpen: (open: boolean) => void;
   toggleCommandCenter: () => void;
+  setCommandCenterPiPOpen: (open: boolean) => void;
   setBrowserHistory: (history: string[]) => void;
   setLastSearchResults: (results: any) => void;
   addActivity: (activity: any) => void;
@@ -94,6 +96,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
   },
   apiKeys: {},
   isCommandCenterOpen: false,
+  commandCenterPiPOpen: false,
   browserHistory: [],
   lastSearchResults: null,
   activities: [],
@@ -130,6 +133,7 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
   })),
   setIsCommandCenterOpen: (isCommandCenterOpen) => set({ isCommandCenterOpen }),
   toggleCommandCenter: () => set((state) => ({ isCommandCenterOpen: !state.isCommandCenterOpen })),
+  setCommandCenterPiPOpen: (commandCenterPiPOpen) => set({ commandCenterPiPOpen }),
   setBrowserHistory: (browserHistory) => set({ browserHistory }),
   setLastSearchResults: (lastSearchResults) => set({ lastSearchResults }),
   addActivity: (activity) => set((state) => ({

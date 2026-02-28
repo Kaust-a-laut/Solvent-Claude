@@ -36,15 +36,24 @@ let cachedSecret: string | null = null;
 async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
 
+  // Primary: Electron preload provides the secret
   if (window.electron?.getSessionSecret) {
     cachedSecret = await window.electron.getSessionSecret();
     return cachedSecret;
   }
 
-  // Pure web mode without Electron is not supported for security reasons
+  // Dev mode fallback: read secret from Vite env variable
+  // Set VITE_BACKEND_SECRET in frontend/.env to match BACKEND_INTERNAL_SECRET
+  const devSecret = (import.meta as any).env?.VITE_BACKEND_SECRET;
+  if (devSecret) {
+    cachedSecret = devSecret;
+    return cachedSecret;
+  }
+
+  // No auth available
   throw new Error(
     'Authentication unavailable: Solvent requires the Electron environment. ' +
-    'Pure web mode is not supported without a secure authentication mechanism.'
+    'For dev mode, set VITE_BACKEND_SECRET in frontend/.env matching your backend secret.'
   );
 }
 

@@ -109,8 +109,9 @@ app.use(helmet({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: { error: 'Too many requests, please try again later.' }
+  max: process.env.NODE_ENV === 'development' ? 2000 : 100, // Higher limit in dev mode
+  message: { error: 'Too many requests, please try again later.' },
+  skip: (req) => req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1', // Skip rate limit for localhost
 });
 app.use('/api/', limiter);
 
@@ -131,14 +132,24 @@ console.log(`[Server] API_SECRET initialized: ${API_SECRET === 'solvent_dev_inse
 
 // Security Middleware
 app.use((req, res, next) => {
-  // Skip secret check for local static images or health checks if needed
-  if (req.path.startsWith('/generated_images') || req.path === '/health') return next();
+  // Skip secret check for:
+  // - Static files (images, uploads)
+  // - Read-only informational endpoints (health, models, settings GET)
+  // - API key validation (user-provided keys, no server secrets exposed)
+  const isPublicPath =
+    req.path.startsWith('/generated_images') ||
+    req.path.startsWith('/files') ||
+    req.path === '/health' ||
+    req.path === '/api/v1/health/services' ||
+    req.path === '/api/v1/models' ||
+    (req.path === '/api/settings' && req.method === 'GET') ||
+    req.path.match(/^\/api\/settings\/providers\/\w+\/validate-key$/);
+
+  if (isPublicPath) return next();
 
   const clientSecret = req.headers['x-solvent-secret'];
   if (clientSecret !== API_SECRET) {
     console.warn(`[SECURITY] Unauthorized request to ${req.path} from ${req.ip}`);
-    console.warn(`[SECURITY] Expected secret: ${API_SECRET}`);
-    console.warn(`[SECURITY] Received secret: ${clientSecret || '(none)'}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid session secret' });
   }
   next();
