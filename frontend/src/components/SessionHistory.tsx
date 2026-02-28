@@ -1,123 +1,142 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MessageSquare, Plus, Trash2, ChevronLeft, 
-  ChevronRight, History, Clock, Search, MoreVertical 
-} from 'lucide-react';
+import { MessageSquare, Plus, Trash2, History, Clock, Search, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { cn } from '../lib/utils';
 
-export const SessionHistory = () => {
+interface SessionHistoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const SessionHistory = ({ isOpen, onClose }: SessionHistoryModalProps) => {
   const { messages, setMessages, sessions } = useAppStore();
-  const [isOpen, setIsOpen] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
+  useEffect(() => { if (!isOpen) setSearchTerm(''); }, [isOpen]);
 
   const allSessions = Object.keys(sessions).map(id => ({
     id,
-    title: sessions[id][0]?.content.slice(0, 30) || 'New Conversation',
-    time: '2h ago'
+    title: sessions[id][0]?.content.slice(0, 50) || 'New Conversation',
+    count: sessions[id].length,
   }));
 
   const sessionList = searchTerm.trim()
     ? allSessions.filter(s => s.title.toLowerCase().includes(searchTerm.toLowerCase()))
     : allSessions;
 
-  const createNewSession = () => {
-    // Logic to clear current messages and start fresh
-    setMessages([]);
+  const createNewSession = () => { setMessages([]); onClose(); };
+
+  const loadSession = (sessionId: string) => {
+    if (sessions[sessionId]) setMessages(sessions[sessionId]);
+    onClose();
   };
 
   return (
-    <div className="relative h-full flex">
-      {/* Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "absolute -right-4 top-1/2 -translate-y-1/2 z-50 w-8 h-8 rounded-full border border-white/5 bg-[#050508] text-slate-500 hover:text-white flex items-center justify-center transition-all",
-          !isOpen && "rotate-180"
-        )}
-      >
-        <ChevronLeft size={14} />
-      </button>
-
-      <motion.div
-        initial={false}
-        animate={{ width: isOpen ? 280 : 0, opacity: isOpen ? 1 : 0 }}
-        className="h-full bg-[#050508]/40 border-r border-white/5 overflow-hidden flex flex-col"
-      >
-        <div className="p-6 flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <History size={18} className="text-jb-accent" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Archives</span>
-            </div>
-            <button 
-              onClick={createNewSession}
-              className="p-2 rounded-xl bg-white/5 border border-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative mb-6">
-            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-            <input 
-              type="text"
-              placeholder="Search history..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/[0.02] border border-white/5 rounded-xl py-2 pl-9 pr-4 text-[10px] font-bold text-white placeholder:text-slate-700 outline-none focus:border-jb-accent/30 transition-all"
-            />
-          </div>
-
-          {/* Session List */}
-          <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
-            {sessionList.length > 0 ? (
-              sessionList.map((session) => (
-                <div 
-                  key={session.id}
-                  className="group p-3 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-jb-accent/20 hover:bg-jb-accent/5 transition-all cursor-pointer relative"
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            key="sh-backdrop"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm"
+          />
+          <motion.div
+            key="sh-modal"
+            initial={{ opacity: 0, scale: 0.93, y: -16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.93, y: -16 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 420 }}
+            className="fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] max-w-[92vw] max-h-[68vh] flex flex-col bg-[#0a0a0f] border border-white/10 rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.8)] overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <History size={15} className="text-jb-accent" />
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Session Archives</span>
+                <span className="text-[9px] font-mono text-slate-600 bg-white/5 px-1.5 py-0.5 rounded">{allSessions.length}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={createNewSession}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-jb-accent/10 border border-jb-accent/20 rounded-lg text-[9px] font-black uppercase text-jb-accent hover:bg-jb-accent/20 transition-all"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-jb-accent transition-colors">
-                      <MessageSquare size={14} />
+                  <Plus size={10} /> New
+                </button>
+                <button onClick={onClose} className="p-1.5 text-slate-600 hover:text-white transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="px-5 py-3 border-b border-white/5">
+              <div className="relative">
+                <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                <input
+                  type="text"
+                  placeholder="Search sessions..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  autoFocus
+                  className="w-full bg-white/[0.03] border border-white/5 rounded-xl py-2 pl-8 pr-4 text-[10px] font-mono text-white placeholder:text-slate-700 outline-none focus:border-jb-accent/30 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-1.5 no-scrollbar">
+              {sessionList.length > 0 ? (
+                sessionList.map(session => (
+                  <div
+                    key={session.id}
+                    onClick={() => loadSession(session.id)}
+                    className="group flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-jb-accent/20 hover:bg-jb-accent/5 cursor-pointer transition-all"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500 group-hover:text-jb-accent transition-colors flex-shrink-0">
+                      <MessageSquare size={13} />
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[10px] font-bold text-slate-300 truncate group-hover:text-white">{session.title}</span>
-                      <span className="text-[8px] font-black text-slate-600 uppercase tracking-tighter mt-0.5">{session.time}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-slate-300 truncate group-hover:text-white">{session.title}</p>
+                      <p className="text-[8px] font-black uppercase tracking-wider text-slate-600 mt-0.5">{session.count} messages</p>
                     </div>
-                  </div>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-1.5 text-slate-600 hover:text-rose-500">
-                      <Trash2 size={12} />
+                    <button
+                      onClick={e => e.stopPropagation()}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-600 hover:text-rose-400 transition-all"
+                    >
+                      <Trash2 size={11} />
                     </button>
                   </div>
+                ))
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-center">
+                  <Clock size={20} className="text-slate-800 mb-2" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">
+                    {searchTerm ? 'No sessions match' : 'No sessions yet'}
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="h-40 flex flex-col items-center justify-center text-center px-4">
-                <Clock size={24} className="text-slate-800 mb-3" />
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-600">No session data synchronized</p>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Stats */}
-          <div className="mt-6 pt-6 border-t border-white/5">
-            <div className="p-4 rounded-2xl bg-jb-accent/5 border border-jb-accent/10">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[8px] font-black text-jb-accent uppercase tracking-widest">Memory Sync</span>
-                <span className="text-[8px] font-mono text-jb-accent/60">98%</span>
-              </div>
-              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full w-[98%] bg-jb-accent shadow-[0_0_8px_rgba(60,113,247,0.5)]" />
-              </div>
+              )}
             </div>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-jb-accent shadow-[0_0_6px_rgba(60,113,247,0.6)]" />
+                <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">Memory Synced</span>
+              </div>
+              <span className="text-[8px] font-mono text-jb-accent/50">98%</span>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 };
