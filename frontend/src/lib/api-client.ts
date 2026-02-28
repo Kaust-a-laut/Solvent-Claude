@@ -30,10 +30,10 @@ let cachedSecret: string | null = null;
  * Priority order:
  * 1. Electron preload: `window.electron.getSessionSecret()`
  * 2. Env override: `VITE_BACKEND_SECRET` in frontend/.env
- * 3. Dev auto-fallback: uses backend's built-in dev default ('solvent_dev_insecure_default')
- *    when `import.meta.env.DEV` is true — no .env file required for local development
+ * 3. Dev auto-fallback: fetches from `GET /dev-secret` (backend-only, localhost, dev mode)
+ *    — no .env file required when running `npm run dev` in both frontend/ and backend/
  *
- * @throws {Error} Only in production builds without Electron
+ * @throws {Error} Only in production builds without Electron, or if backend is unreachable
  */
 async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
@@ -52,19 +52,27 @@ async function getSecret(): Promise<string> {
     return cachedSecret;
   }
 
-  // Auto dev-mode fallback: use the backend's built-in dev default.
-  // The backend defaults to 'solvent_dev_insecure_default' when BACKEND_INTERNAL_SECRET
-  // is not set in its environment. This lets the full app work in browser dev mode
-  // (npm run dev) without any .env file setup.
+  // Dev auto-fallback: fetch the actual secret from the backend's /dev-secret endpoint.
+  // Mirrors what Electron's window.electron.getSessionSecret() preload does —
+  // the backend already has the correct secret; we just ask for it over localhost.
+  // /dev-secret only exists in NODE_ENV=development and only responds to localhost IPs.
   // In production builds import.meta.env.DEV is false so this branch never runs.
   if ((import.meta as any).env?.DEV) {
-    cachedSecret = 'solvent_dev_insecure_default';
-    return cachedSecret;
+    try {
+      const res = await fetch('/dev-secret');
+      if (res.ok) {
+        const data = await res.json() as { secret: string };
+        cachedSecret = data.secret;
+        return cachedSecret;
+      }
+    } catch {
+      // Backend not running yet — fall through to error below
+    }
   }
 
-  // No auth available (production browser without Electron)
+  // No auth available (production browser without Electron, or backend unreachable in dev)
   throw new Error(
-    'Authentication unavailable: Solvent requires the Electron environment.'
+    'Authentication unavailable: ensure the backend is running (npm run dev in backend/).'
   );
 }
 
