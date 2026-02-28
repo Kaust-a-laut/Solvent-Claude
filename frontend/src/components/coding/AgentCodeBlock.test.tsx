@@ -33,4 +33,16 @@ describe('AgentCodeBlock', () => {
     render(<AgentCodeBlock suggestion={{ ...suggestion, applied: true }} onApply={vi.fn()} onReject={vi.fn()} />);
     expect(screen.getByText('Applied')).toBeTruthy();
   });
+
+  it('calls onReject with suggestion id', () => {
+    const onReject = vi.fn();
+    render(<AgentCodeBlock suggestion={suggestion} onApply={vi.fn()} onReject={onReject} />);
+    fireEvent.click(screen.getByText('Reject'));
+    expect(onReject).toHaveBeenCalledWith('sg1');
+  });
+
+  it('shows Rejected badge when rejected=true', () => {
+    render(<AgentCodeBlock suggestion={{ ...suggestion, rejected: true }} onApply={vi.fn()} onReject={vi.fn()} />);
+    expect(screen.getByText('Rejected')).toBeTruthy();
+  });
 });
