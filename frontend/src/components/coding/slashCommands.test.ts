@@ -14,6 +14,12 @@ describe('parseSlashCommand', () => {
   it('returns command for /explain with no rest', () => {
     expect(parseSlashCommand('/explain')).toEqual({ command: 'explain', rest: '' });
   });
+  it('returns parsed command even for unknown command ids', () => {
+    expect(parseSlashCommand('/unknown some text')).toEqual({ command: 'unknown', rest: 'some text' });
+  });
+  it('returns null for inputs starting with //', () => {
+    expect(parseSlashCommand('// a comment')).toBeNull();
+  });
 });
 
 describe('buildSystemPrompt', () => {
@@ -25,6 +31,10 @@ describe('buildSystemPrompt', () => {
   it('includes selection when provided', () => {
     const prompt = buildSystemPrompt('src/app.ts', 'const x = 1;', 'const x = 1;');
     expect(prompt).toContain('Selected code');
+  });
+  it('omits file section when filePath is null', () => {
+    const prompt = buildSystemPrompt(null, null, null);
+    expect(prompt).not.toContain('Active file:');
   });
 });
 

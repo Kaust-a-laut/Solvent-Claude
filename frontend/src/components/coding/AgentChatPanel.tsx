@@ -26,17 +26,22 @@ function extractCodeBlocks(text: string): { cleanText: string; blocks: CodeSugge
 
 export const AgentChatPanel: React.FC = () => {
   const {
-    agentMessages, addAgentMessage, clearAgentMessages, updateAgentMessage,
+    addAgentMessage, clearAgentMessages, updateAgentMessage,
     activeFile, openFiles, selectedCloudModel, selectedCloudProvider, apiKeys,
     setPendingDiff,
   } = useAppStore();
 
+  // Read agentMessages from store for rendering (not for closure capture)
+  const agentMessages = useAppStore((s) => s.agentMessages);
+
   const [input, setInput] = useState('');
   const [fileContextActive, setFileContextActive] = useState(true);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const activeFileContent = openFiles.find((f) => f.path === activeFile)?.content ?? null;
 
@@ -44,11 +49,21 @@ export const AgentChatPanel: React.FC = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [agentMessages]);
 
+  // Cleanup: abort any in-flight request on unmount
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || isGenerating) return;
     setInput('');
     setShowSlashMenu(false);
+
+    // Abort any previous in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const parsed = parseSlashCommand(text);
     const slashCmd = parsed ? SLASH_COMMANDS.find((c) => c.id === parsed.command) : null;
@@ -69,15 +84,19 @@ export const AgentChatPanel: React.FC = () => {
         null
       );
 
+      // Read current messages from store at call time to avoid stale closure
+      const currentMessages = useAppStore.getState().agentMessages;
+
       const messages = [
         { role: 'system', content: slashCmd ? slashCmd.systemInstruction + '\n\n' + systemPrompt : systemPrompt },
-        ...agentMessages.map((m) => ({ role: m.role, content: m.content })),
+        ...currentMessages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user', content: parsed?.rest || text },
       ];
 
       const data = await fetchWithRetry(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           provider: selectedCloudProvider || 'groq',
           model: selectedCloudModel,
@@ -97,22 +116,19 @@ export const AgentChatPanel: React.FC = () => {
       };
       addAgentMessage(assistantMsg);
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
       const message = err instanceof Error ? err.message : 'Unknown error';
-      addAgentMessage({
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: `⚠️ Error: ${message}`,
-      });
+      addAgentMessage({ id: `err-${Date.now()}`, role: 'assistant', content: `⚠️ Error: ${message}` });
     } finally {
       setIsGenerating(false);
     }
-  }, [input, isGenerating, agentMessages, activeFile, activeFileContent, fileContextActive,
+  }, [input, isGenerating, activeFile, activeFileContent, fileContextActive,
       addAgentMessage, selectedCloudModel, selectedCloudProvider, apiKeys, setPendingDiff]);
 
   const handleApply = (msgId: string, blockId: string) => {
     const msg = agentMessages.find((m) => m.id === msgId);
     const block = msg?.codeBlocks?.find((b) => b.id === blockId);
-    if (!block || !activeFile || !activeFileContent) return;
+    if (!msg || !block || !activeFile || !activeFileContent) return;
     setPendingDiff({
       original: activeFileContent,
       modified: block.code,
@@ -120,7 +136,7 @@ export const AgentChatPanel: React.FC = () => {
       description: 'AI suggestion from chat',
     });
     updateAgentMessage(msgId, {
-      codeBlocks: msg!.codeBlocks!.map((b) => b.id === blockId ? { ...b, applied: true } : b),
+      codeBlocks: (msg.codeBlocks ?? []).map((b) => b.id === blockId ? { ...b, applied: true } : b),
     });
   };
 
@@ -133,6 +149,30 @@ export const AgentChatPanel: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showSlashMenu) {
+      const filtered = SLASH_COMMANDS.filter((c) => input === '/' || c.id.startsWith(input.slice(1)));
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashMenuIndex((i) => Math.min(i + 1, filtered.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashMenuIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && filtered.length > 0)) {
+        const selected = filtered[slashMenuIndex];
+        if (selected) {
+          e.preventDefault();
+          setInput(selected.label + ' ');
+          setShowSlashMenu(false);
+          setSlashMenuIndex(0);
+          inputRef.current?.focus();
+          return;
+        }
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -147,6 +187,7 @@ export const AgentChatPanel: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     setShowSlashMenu(e.target.value.startsWith('/') && e.target.value.length < 20);
+    setSlashMenuIndex(0);
   };
 
   const renderMessageContent = (msg: AgentMessage) => {
@@ -243,13 +284,18 @@ export const AgentChatPanel: React.FC = () => {
 
       {/* Slash command menu */}
       {showSlashMenu && (
-        <div className="mx-3 mb-1 rounded-xl border border-white/[0.07] bg-[#0a0a14] overflow-hidden">
-          {SLASH_COMMANDS.filter((c) => input === '/' || c.id.startsWith(input.slice(1))).map((cmd) => (
+        <div role="listbox" className="mx-3 mb-1 rounded-xl border border-white/[0.07] bg-[#0a0a14] overflow-hidden">
+          {SLASH_COMMANDS.filter((c) => input === '/' || c.id.startsWith(input.slice(1))).map((cmd, idx) => (
             <button
               key={cmd.id}
+              role="option"
+              aria-selected={idx === slashMenuIndex}
               type="button"
-              onClick={() => { setInput(cmd.label + ' '); setShowSlashMenu(false); inputRef.current?.focus(); }}
-              className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 text-left transition-colors"
+              onClick={() => { setInput(cmd.label + ' '); setShowSlashMenu(false); setSlashMenuIndex(0); inputRef.current?.focus(); }}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 text-left transition-colors",
+                idx === slashMenuIndex ? "bg-white/8" : "hover:bg-white/5"
+              )}
             >
               <span className="text-[11px] font-mono text-jb-accent font-bold w-20 shrink-0">{cmd.label}</span>
               <span className="text-[10px] text-white/40">{cmd.description}</span>
@@ -286,6 +332,8 @@ export const AgentChatPanel: React.FC = () => {
             onKeyDown={handleKeyDown}
             placeholder="/fix, /explain, /test…"
             rows={2}
+            aria-expanded={showSlashMenu}
+            aria-haspopup="listbox"
             className="flex-1 bg-white/[0.03] border border-white/[0.07] rounded-xl px-3 py-2 text-[12px] text-slate-200 placeholder-white/20 resize-none focus:outline-none focus:border-jb-accent/30 scrollbar-thin"
           />
           <button
