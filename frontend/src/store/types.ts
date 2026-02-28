@@ -3,6 +3,7 @@ import { SettingsSlice } from './settingsSlice';
 import { GraphSlice } from './graphSlice';
 import { ActionSlice } from './actionSlice';
 import { WaterfallSlice } from './waterfallSlice';
+import { CodingSlice } from './codingSlice';
 
 export interface ProvenanceItem {
   id: string;
@@ -88,4 +89,4 @@ export interface DeviceInfo {
   };
 }
 
-export type AppState = ChatSlice & SettingsSlice & GraphSlice & ActionSlice & WaterfallSlice;
+export type AppState = ChatSlice & SettingsSlice & GraphSlice & ActionSlice & WaterfallSlice & CodingSlice;
