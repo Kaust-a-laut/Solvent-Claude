@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Save, Play, Cpu, Loader2, Box, Globe, X } from 'lucide-react';
 import { WebContainer } from '@webcontainer/api';
+import type { WebContainerProcess } from '@webcontainer/api';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,7 +56,7 @@ export const CodingArea = () => {
   const isBootingRef = useRef(false);
 
   // Fix 2: ref to track the running WebContainer process
-  const runningProcRef = useRef<{ kill: () => void } | null>(null);
+  const runningProcRef = useRef<WebContainerProcess | null>(null);
 
   const currentFile = openFiles.find((f) => f.path === activeFile);
 
