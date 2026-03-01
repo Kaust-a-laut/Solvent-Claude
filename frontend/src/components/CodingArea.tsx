@@ -205,7 +205,7 @@ export const CodingArea = () => {
   type ReviewStatus = 'analyzing' | 'approved' | 'rejected';
   interface ReviewBreakdown { syntax: number; security: number; logic: number; efficiency: number; }
 
-  const getReviewScorecard = () => {
+  const getReviewScorecard = (): React.ReactNode => {
     if (!reviewState) return null;
     const rs = reviewState as Record<string, unknown>;
     const bd = rs.breakdown as ReviewBreakdown;
