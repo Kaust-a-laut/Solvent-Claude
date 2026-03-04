@@ -63,6 +63,27 @@ router.get('/tasks/:jobId', async (req, res) => {
   }
 });
 
+// Conclusive Analysis Endpoint
+// Re-synthesizes agent opinions + user context into a deeper actionable analysis
+router.post('/analyze', async (req, res) => {
+  const { opinions, synthesis, userContext, missionType } = req.body;
+  if (!opinions || !synthesis) {
+    return res.status(400).json({ error: 'opinions and synthesis are required' });
+  }
+
+  try {
+    const analysis = await orchestrationService.analyzeFindings(
+      opinions,
+      synthesis,
+      userContext,
+      missionType
+    );
+    res.json({ analysis });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Manual Overseer Trigger Endpoint
 // Allows the Command Center to fire a live-context think() cycle on demand
 router.post('/overseer/trigger', async (req, res) => {

@@ -76,10 +76,88 @@ export class OrchestrationService {
         'The refinement must maintain backwards compatibility where applicable.'
       ]
     });
+
+    // 3. Research Mission (Evidence-based investigation)
+    this.templates.set('research', {
+      id: 'research',
+      agents: [
+        { id: 'researcher', name: 'Research Specialist', instruction: 'Gather deep context, cite evidence, and surface relevant precedents and data points.' },
+        { id: 'analyst', name: 'Data Analyst', instruction: 'Identify patterns in the research, draw data-driven conclusions, and quantify trade-offs where possible.' },
+        { id: 'devil', name: "Devil's Advocate", instruction: 'Challenge the prevailing assumptions, surface blind spots, and argue the strongest counterpoint.' }
+      ],
+      synthesisInstruction: 'Synthesize the research findings into a comprehensive evidence-based brief with clear conclusions and recommended next steps.',
+      intentAssertions: [
+        'All conclusions must be grounded in evidence rather than speculation.',
+        'The analysis must actively challenge initial assumptions.',
+        'Conflicting evidence must be acknowledged rather than ignored.'
+      ]
+    });
+
+    // 4. Code Review Mission (Engineering quality gate)
+    this.templates.set('code-review', {
+      id: 'code-review',
+      agents: [
+        { id: 'architect', name: 'Software Architect', instruction: 'Review overall design, system structure, scalability patterns, and architectural trade-offs.' },
+        { id: 'reviewer', name: 'Code Reviewer', instruction: 'Assess code quality, naming conventions, readability, test coverage, and adherence to best practices.' },
+        { id: 'security', name: 'Security Auditor', instruction: 'Identify vulnerabilities, injection risks, authentication gaps, and hardening opportunities.' }
+      ],
+      synthesisInstruction: 'Produce a prioritized code review report with actionable improvement items, grouped by severity (critical / major / minor).',
+      intentAssertions: [
+        'Security findings must be prioritized above style concerns.',
+        'Recommendations must not suggest breaking changes to public APIs.',
+        'Every critical finding must include a concrete remediation suggestion.'
+      ]
+    });
   }
 
   getTemplate(templateId: string): MissionTemplate | undefined {
     return this.templates.get(templateId);
+  }
+
+  /**
+   * Conclusive re-synthesis pass — called after all parallel agents have completed.
+   * Takes their opinions + initial synthesis + optional user framing and produces
+   * a deeper, actionable analysis in a single LLM call.
+   */
+  async analyzeFindings(
+    opinions: Array<{ id?: string; agent?: string; role?: string; opinion: string }>,
+    synthesis: string,
+    userContext?: string,
+    missionType?: string
+  ): Promise<string> {
+    const provider = await providerSelector.select({
+      priority: 'cost',
+      requirements: {}
+    });
+    const model = provider.defaultModel || 'default';
+
+    const opinionText = opinions
+      .map(o => `--- ${o.agent || o.role || o.id || 'Agent'} ---\n${o.opinion}`)
+      .join('\n\n');
+
+    const prompt = `You are a senior analytical synthesizer. You have received expert opinions from a ${missionType || 'multi-agent'} mission.
+
+EXPERT OPINIONS:
+${opinionText}
+
+INITIAL SYNTHESIS:
+${synthesis}
+${userContext ? `\nADDITIONAL CONTEXT FROM USER:\n${userContext}` : ''}
+
+Produce a conclusive analysis that goes meaningfully deeper than the initial synthesis. Specifically:
+1. Identify the single most critical insight that the agents collectively surfaced
+2. Surface any tensions or contradictions between the expert opinions and resolve them
+3. Provide 3-5 concrete, prioritized next steps ordered by impact
+4. Flag any blind spots or risks that none of the agents addressed
+
+Be direct, specific, and actionable. Avoid restating the initial synthesis verbatim.`;
+
+    logger.info(`[Orchestrator] Running analyzeFindings for missionType: ${missionType}`);
+    const analysis = await provider.complete(
+      [{ role: 'user', content: prompt }],
+      { model }
+    );
+    return analysis;
   }
 
   async runMission(

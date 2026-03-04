@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from './types';
-import { fetchWithRetry } from '../lib/api-client';
+import { fetchWithRetry, getSecret } from '../lib/api-client';
 import { API_BASE_URL } from '../lib/config';
 import { waterfallStateMachine } from '../lib/waterfallStateMachine';
 
@@ -29,6 +29,10 @@ export interface WaterfallSlice {
   runWaterfallStep: (step: 'architect' | 'reasoner' | 'executor' | 'reviewer', input: any) => Promise<void>;
   cancelWaterfall: () => void;
   resetWaterfall: () => void;
+  editPlanDraft: string | null;
+  setEditPlanDraft: (draft: string | null) => void;
+  applyEditedPlan: () => void;
+  retryCount: number;
 }
 
 const initialStepState: WaterfallStepData = { status: 'idle', data: null, error: null };
@@ -45,6 +49,8 @@ export const createWaterfallSlice: StateCreator<AppState, [], [], WaterfallSlice
     }
   },
   waterfallAbortController: null,
+  editPlanDraft: null,
+  retryCount: 0,
 
   setWaterfallPrompt: (prompt) => set((state) => ({
     waterfall: { ...state.waterfall, prompt }
@@ -65,7 +71,9 @@ export const createWaterfallSlice: StateCreator<AppState, [], [], WaterfallSlice
           reviewer: { ...initialStepState }
         }
       },
-      waterfallAbortController: null
+      waterfallAbortController: null,
+      editPlanDraft: null,
+      retryCount: 0,
     });
   },
 
@@ -93,6 +101,31 @@ export const createWaterfallSlice: StateCreator<AppState, [], [], WaterfallSlice
   proceedWithWaterfall: () => {
     const { waterfall } = get();
     get().runFullWaterfall(waterfall.prompt, true);
+  },
+
+  setEditPlanDraft: (draft) => set({ editPlanDraft: draft }),
+
+  applyEditedPlan: () => {
+    const { editPlanDraft } = get();
+    if (!editPlanDraft) return;
+    try {
+      const parsed = JSON.parse(editPlanDraft);
+      set((state) => ({
+        editPlanDraft: null,
+        waterfall: {
+          ...state.waterfall,
+          steps: {
+            ...state.waterfall.steps,
+            architect: {
+              ...state.waterfall.steps.architect,
+              data: { ...state.waterfall.steps.architect.data, ...parsed }
+            }
+          }
+        }
+      }));
+    } catch {
+      // Invalid JSON — silently ignore, keep draft open
+    }
   },
 
   runFullWaterfall: async (prompt: string, forceProceed: boolean = false) => {
@@ -125,11 +158,12 @@ export const createWaterfallSlice: StateCreator<AppState, [], [], WaterfallSlice
     }
 
     try {
+      const secret = await getSecret();
       const response = await fetch(`${API_BASE_URL}/waterfall`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'x-solvent-secret': 'solvent_internal_dev_secret'
+          'X-Solvent-Secret': secret
         },
         body: JSON.stringify({ prompt, globalProvider, notepadContent, openFiles, forceProceed }),
         signal: controller.signal
@@ -151,6 +185,10 @@ export const createWaterfallSlice: StateCreator<AppState, [], [], WaterfallSlice
             try {
               const payload = JSON.parse(line.slice(6));
               const { phase, message, estimate } = payload;
+
+              if (phase === 'retrying') {
+                set((state) => ({ retryCount: state.retryCount + 1 }));
+              }
 
               set((state) => {
                 // HANDLE GATING

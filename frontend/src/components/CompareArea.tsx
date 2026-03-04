@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { API_BASE_URL } from '../lib/config';
+import { getSecret } from '../lib/api-client';
 import { GitCompare, Sparkles, RefreshCw, Bot, AlertCircle, Cloud, Shield } from 'lucide-react';
 import { parse } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,9 +22,10 @@ export const CompareArea = () => {
     setError(null);
 
     try {
+      const secret = await getSecret();
       const response = await fetch(`${API_BASE_URL}/compare`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Solvent-Secret': secret },
         body: JSON.stringify({
           messages: [{ role: 'user', content: prompt }]
         })

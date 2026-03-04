@@ -11,6 +11,7 @@ import fileRoutes from './routes/fileRoutes';
 import aiRoutes from './routes/aiRoutes';
 import debugRoutes from './routes/debugRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import memoryRoutes from './routes/memoryRoutes';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -22,9 +23,17 @@ import { taskService, TaskQueue } from './services/taskService';
 const app = express();
 const httpServer = createServer(app);
 
-// Security: Restrict CORS to configured origin (not wildcard in production)
+// Security: Restrict CORS to configured origin(s) (not wildcard in production)
+// CORS_ORIGIN supports comma-separated values: "http://localhost:5173,http://127.0.0.1:5173"
+const allowedOrigins = config.CORS_ORIGIN.split(',').map(o => o.trim());
 const corsOptions = {
-  origin: config.CORS_ORIGIN,
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'X-Solvent-Secret'],
   credentials: true
@@ -173,6 +182,7 @@ app.use((req, res, next) => {
 
 // --- API Routes ---
 app.use('/api/v1', aiRoutes);
+app.use('/api/v1', memoryRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/debug', debugRoutes);
 app.use('/api/settings', settingsRoutes);

@@ -28,6 +28,27 @@ export const Navigation = () => {
 
   const NavItem = ({ mode, icon: Icon, label, color }: any) => {
     const isActive = currentMode === mode;
+
+    const getLineColor = (color?: string): string => {
+      const lineMap: Record<string, string> = {
+        'text-jb-accent': 'via-jb-accent/70',
+        'text-jb-purple': 'via-jb-purple/70',
+        'text-jb-orange': 'via-jb-orange/70',
+        'text-jb-cyan': 'via-jb-cyan/70',
+      };
+      return lineMap[color || ''] ?? 'via-white/50';
+    };
+
+    const getActiveBg = (color?: string): string => {
+      const bgMap: Record<string, string> = {
+        'text-jb-accent': 'bg-jb-accent/[0.07]',
+        'text-jb-purple': 'bg-jb-purple/[0.07]',
+        'text-jb-orange': 'bg-jb-orange/[0.07]',
+        'text-jb-cyan': 'bg-jb-cyan/[0.07]',
+      };
+      return bgMap[color || ''] ?? 'bg-white/5';
+    };
+
     return (
       <motion.button
         whileHover={{ x: isCollapsed ? 0 : 4, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
@@ -38,17 +59,17 @@ export const Navigation = () => {
         }}
         className={cn(
           "w-full flex items-center transition-all duration-300 group relative overflow-hidden",
-          isActive 
-            ? "bg-white/5 text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]" 
+          isActive
+            ? `${getActiveBg(color)} text-white shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]`
             : "text-slate-500 hover:text-slate-200",
           isCollapsed ? "justify-center px-0 py-3 rounded-xl" : "justify-between px-4 py-3 rounded-2xl"
         )}
         title={isCollapsed ? label : undefined}
       >
         {isActive && !isCollapsed && (
-          <motion.div 
+          <motion.div
             layoutId="navGlow"
-            className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-white/40 to-transparent"
+            className={`absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent to-transparent ${getLineColor(color)}`}
           />
         )}
         

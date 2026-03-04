@@ -30,6 +30,8 @@ interface BentoCardProps {
   image?: string;
   preview?: React.ReactNode;
   className?: string;
+  hoverBorder?: string;
+  badgeColor?: string;
 }
 
 export const BentoCard = ({
@@ -47,7 +49,9 @@ export const BentoCard = ({
   delay = 0,
   image,
   preview,
-  className
+  className,
+  hoverBorder = 'group-hover:border-white/20',
+  badgeColor,
 }: BentoCardProps) => {
   return (
     <motion.div
@@ -59,14 +63,14 @@ export const BentoCard = ({
       onClick={onClick}
       className={cn(
         "group relative p-6 md:p-8 lg:p-10 rounded-[2.5rem] border transition-all duration-500 cursor-pointer overflow-hidden glass-panel button-glow-hover h-full flex flex-col justify-between min-h-[260px]",
-        bg, border, span, className
+        bg, border, span, className, hoverBorder
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-white/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
       
       {/* HUD Lines from v1.1 */}
-      <div className="absolute top-0 right-0 w-24 h-[1px] bg-white/[0.05] group-hover:bg-jb-accent/20 transition-colors" />
-      <div className="absolute top-0 right-0 w-[1px] h-24 bg-white/[0.05] group-hover:bg-jb-accent/20 transition-colors" />
+      <div className="absolute top-0 right-0 w-24 h-[1px] bg-white/[0.05] group-hover:bg-white/15 transition-colors" />
+      <div className="absolute top-0 right-0 w-[1px] h-24 bg-white/[0.05] group-hover:bg-white/15 transition-colors" />
 
       <div className="relative z-10 space-y-6 flex-1 flex flex-col">
         <div className="flex justify-between items-start">
@@ -74,7 +78,10 @@ export const BentoCard = ({
             <Icon size={26} strokeWidth={1.5} />
           </div>
           {badge && (
-            <span className="px-3 py-1 rounded-lg bg-black/40 text-[9px] font-black text-white/60 uppercase tracking-[0.2em] border border-white/10 backdrop-blur-md">
+            <span className={cn(
+              "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] backdrop-blur-md",
+              badgeColor ?? "bg-black/40 text-white/60 border border-white/10"
+            )}>
               {badge}
             </span>
           )}

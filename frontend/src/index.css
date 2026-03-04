@@ -303,4 +303,37 @@
     animation: provider-ripple 0.6s ease-out;
     pointer-events: none;
   }
+
+  /* Input Focus Ring */
+  .input-focus-ring {
+    @apply focus:outline-none transition-all duration-200;
+  }
+  .input-focus-ring:focus {
+    box-shadow: 0 0 0 1px rgba(60, 113, 247, 0.3), inset 0 0 0 1px rgba(60, 113, 247, 0.2);
+    border-color: rgba(60, 113, 247, 0.4) !important;
+  }
+
+  /* Colored Processing Pulses */
+  .pulse-purple {
+    animation: pulse-color-purple 1.5s ease-in-out infinite;
+  }
+  .pulse-accent {
+    animation: pulse-color-accent 1.5s ease-in-out infinite;
+  }
+  .pulse-orange {
+    animation: pulse-color-orange 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-color-purple {
+    0%, 100% { opacity: 0.4; box-shadow: 0 0 4px rgba(157, 91, 210, 0.4); }
+    50%       { opacity: 1;   box-shadow: 0 0 12px rgba(157, 91, 210, 0.8); }
+  }
+  @keyframes pulse-color-accent {
+    0%, 100% { opacity: 0.4; box-shadow: 0 0 4px rgba(60, 113, 247, 0.4); }
+    50%       { opacity: 1;   box-shadow: 0 0 12px rgba(60, 113, 247, 0.8); }
+  }
+  @keyframes pulse-color-orange {
+    0%, 100% { opacity: 0.4; box-shadow: 0 0 4px rgba(251, 146, 60, 0.4); }
+    50%       { opacity: 1;   box-shadow: 0 0 12px rgba(251, 146, 60, 0.8); }
+  }
 }

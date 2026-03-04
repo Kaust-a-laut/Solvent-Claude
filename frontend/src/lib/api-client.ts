@@ -35,7 +35,7 @@ let cachedSecret: string | null = null;
  *
  * @throws {Error} Only in production builds without Electron, or if backend is unreachable
  */
-async function getSecret(): Promise<string> {
+export async function getSecret(): Promise<string> {
   if (cachedSecret) return cachedSecret;
 
   // Primary: Electron preload provides the secret

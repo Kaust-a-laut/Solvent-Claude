@@ -1,240 +1,381 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { API_BASE_URL } from '../lib/config';
-import { Swords, Bot, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { getSecret } from '../lib/api-client';
+import { Swords, Sparkles, RefreshCw, AlertCircle, GitMerge } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { parse } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BentoItem } from './BentoGrid';
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface DebateState {
+  proponent: string | null;
+  critic:    string | null;
+  synthesis: string | null;
+}
+
+const EMPTY_DEBATE: DebateState = { proponent: null, critic: null, synthesis: null };
+
+// ─── Panel config ───────────────────────────────────────────────────────────────
+
+const PANEL_CONFIGS = {
+  proponent: {
+    label:     'PROPONENT',
+    badgeCls:  'bg-jb-accent/10 border-jb-accent/25 text-jb-accent',
+    borderCls: 'border-l-4 border-jb-accent',
+    dotCls:    'bg-jb-accent',
+    dotShadow: '0 0 8px rgba(60,113,247,0.8)',
+  },
+  critic: {
+    label:     'CRITIC',
+    badgeCls:  'bg-jb-orange/10 border-jb-orange/25 text-jb-orange',
+    borderCls: 'border-l-4 border-jb-orange',
+    dotCls:    'bg-jb-orange',
+    dotShadow: '0 0 8px rgba(251,146,60,0.8)',
+  },
+} as const;
+
+// ─── Sub-component: Debate panel ────────────────────────────────────────────────
+
+interface DebatePanelProps {
+  role:      'proponent' | 'critic';
+  content:   string | null;
+  agentName: string;
+  isLoading: boolean;
+}
+
+const DebatePanel = ({ role, content, agentName, isLoading }: DebatePanelProps) => {
+  const cfg = PANEL_CONFIGS[role];
+
+  return (
+    <div className={cn('glass-panel rounded-[1.5rem] overflow-hidden flex flex-col min-h-[260px]', cfg.borderCls)}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.04]">
+        <div className="flex items-center gap-3">
+          <span className={cn(
+            'px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border',
+            cfg.badgeCls,
+          )}>
+            {cfg.label}
+          </span>
+          <span className="text-[11px] font-black text-white">{agentName}</span>
+        </div>
+
+        {/* Pulsing dots while loading */}
+        {isLoading && (
+          <div className="flex items-center gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
+                className={cn('w-1.5 h-1.5 rounded-full', cfg.dotCls)}
+                style={{ boxShadow: cfg.dotShadow }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 p-5 overflow-y-auto scrollbar-thin">
+        <AnimatePresence mode="wait">
+          {content ? (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="chat-bubble-ai liquid-message rounded-2xl p-5"
+            >
+              <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{content}</p>
+            </motion.div>
+          ) : isLoading ? (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-3 pt-1"
+            >
+              {[75, 50, 65, 40].map((w, i) => (
+                <div
+                  key={i}
+                  className="h-2.5 rounded-full bg-white/[0.04] animate-pulse"
+                  style={{ width: `${w}%`, animationDelay: `${i * 150}ms` }}
+                />
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-center py-12"
+            >
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">
+                Awaiting debate
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Component ─────────────────────────────────────────────────────────────
 
 export const DebateArea = () => {
   const { deviceInfo } = useAppStore();
   const [isDebating, setIsDebating] = useState(false);
-  const [leftHistory, setLeftHistory] = useState<any[]>([]);
-  const [rightHistory, setRightHistory] = useState<any[]>([]);
-  const [topic, setTopic] = useState("The future of Artificial Intelligence");
-  const [error, setError] = useState<string | null>(null);
+  const [debate, setDebate]         = useState<DebateState>(EMPTY_DEBATE);
+  const [topic, setTopic]           = useState('The future of Artificial Intelligence');
+  const [error, setError]           = useState<string | null>(null);
 
-  const callModel = async (provider: string, model: string, history: any[], prompt: string) => {
+  const handleStartDebate = async () => {
+    if (!topic.trim() || isDebating) return;
+    setIsDebating(true);
+    setError(null);
+    setDebate(EMPTY_DEBATE);
+
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-           provider,
-           model,
-           messages: [...history, { role: 'user', content: prompt }]
-        })
+      const secret   = await getSecret();
+      const response = await fetch(`${API_BASE_URL}/debate`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Solvent-Secret': secret },
+        body:    JSON.stringify({ topic }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Agent failed.');
-      return data.response;
-    } catch (err: any) {
-      throw new Error(err.message || 'Model unreachable.');
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Debate failed.');
+      }
+
+      const result      = await response.json();
+      const rounds      = result.rounds ?? [];
+      const proponent   = rounds.find((r: any) => r.role === 'proponent');
+      const critic      = rounds.find((r: any) => r.role === 'critic');
+      const synthesizer = rounds.find((r: any) => r.role === 'synthesizer');
+
+      setDebate({
+        proponent: proponent?.content   ?? null,
+        critic:    critic?.content      ?? null,
+        synthesis: synthesizer?.content ?? null,
+      });
+    } catch (e: any) {
+      setError(e.message || 'An error occurred.');
+    } finally {
+      setIsDebating(false);
     }
   };
 
-  const handleStartDebate = async () => {
-     if (!topic.trim()) return;
-     setIsDebating(true);
-     setError(null);
-     setLeftHistory([]);
-     setRightHistory([]);
-
-     try {
-         const response = await fetch(`${API_BASE_URL}/debate`, {
-           method: 'POST',
-           headers: { 
-             'Content-Type': 'application/json',
-             'x-solvent-secret': 'solvent_dev_insecure_default' // Using default for now
-           },
-           body: JSON.stringify({ topic })
-         });
-         
-         if (!response.ok) {
-           const errData = await response.json();
-           throw new Error(errData.error || 'Debate failed.');
-         }
-
-         const result = await response.json();
-         
-         // Map the result rounds to the UI columns
-         // Result rounds: [proponent (Gemini), critic (Ollama), synthesizer (Gemini)]
-         const proponent = result.rounds.find((r: any) => r.role === 'proponent');
-         const critic = result.rounds.find((r: any) => r.role === 'critic');
-         const synthesis = result.rounds.find((r: any) => r.role === 'synthesizer');
-
-         if (proponent) setLeftHistory([{ agent: 'Gemini Pro', content: proponent.content }]);
-         if (critic) setRightHistory([{ agent: 'Qwen 2.5', content: critic.content }]);
-         if (synthesis) setLeftHistory(prev => [...prev, { agent: 'Gemini Pro (Synthesized)', content: synthesis.content }]);
-
-     } catch (e: any) {
-         console.error(e);
-         setError(e.message);
-     } finally {
-         setIsDebating(false);
-     }
-  };
+  const hasContent = debate.proponent || debate.critic || debate.synthesis;
 
   return (
-    <div className={cn(
-      "flex flex-col h-full bg-black/20 backdrop-blur-3xl overflow-y-auto scrollbar-thin transition-all duration-500",
-      deviceInfo.isMobile ? "p-4 pt-28 pb-32" : "p-12"
-    )}>
-      
+    <div className="flex flex-col h-full bg-black/20 backdrop-blur-3xl overflow-y-auto scrollbar-thin">
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className={cn(
-        "flex mb-12 gap-8",
-        deviceInfo.isMobile ? "flex-col items-start" : "items-center justify-between"
+        'flex items-center border-b border-white/5 bg-black/40 shrink-0 transition-all duration-500',
+        deviceInfo.isMobile ? 'px-6 pt-28 pb-8 h-auto' : 'px-12 h-28',
       )}>
         <div className="flex items-center gap-6">
-            <div className="w-16 h-16 bg-jb-pink/10 rounded-[2rem] flex items-center justify-center border border-jb-pink/20 shadow-2xl relative group">
-                <div className="absolute inset-0 bg-jb-pink/20 rounded-[2rem] blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Swords className="text-jb-pink relative z-10" size={32} />
-            </div>
-            <div>
-                <h2 className="text-3xl md:text-4xl font-[900] text-white tracking-tighter">Adversarial Debate <span className="text-vibrant">Lab</span></h2>
-                <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em] mt-1">Cross-Model Dialectical Synthesis</p>
-            </div>
-        </div>
-
-        <div className={cn(
-          "flex gap-3 w-full",
-          deviceInfo.isMobile ? "flex-col" : "md:w-auto"
-        )}>
-            <div className="relative group">
-                <input 
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className={cn(
-                    "bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-jb-pink/50 transition-all text-white placeholder:text-slate-600 font-bold backdrop-blur-xl",
-                    deviceInfo.isMobile ? "w-full" : "w-[450px]"
-                  )}
-                  placeholder="Enter debate topic..."
-                />
-            </div>
-            <button 
-                onClick={handleStartDebate} 
-                disabled={isDebating}
-                className="bg-jb-pink text-white hover:bg-rose-600 px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-20 shadow-[0_20px_40px_rgba(244,63,94,0.3)] group"
-            >
-                {isDebating ? <RefreshCw className="animate-spin" size={16}/> : <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />}
-                {isDebating ? 'Simulating' : 'Ignite Debate'}
-            </button>
+          {/* Icon with dot accent */}
+          <div className="relative w-14 h-14 bg-jb-orange/10 rounded-[2rem] flex items-center justify-center border border-jb-orange/20 shadow-2xl shrink-0">
+            <div className="absolute inset-0 bg-jb-orange/10 rounded-[2rem] blur-xl opacity-70" />
+            <Swords className="text-jb-orange relative z-10" size={26} />
+            <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-jb-orange shadow-[0_0_10px_rgba(251,146,60,0.9)] animate-pulse" />
+          </div>
+          <div>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.45em] block mb-1.5">
+              Adversarial Debate Lab
+            </span>
+            <h2 className="text-2xl md:text-3xl font-black tracking-tighter leading-none">
+              Dual-Model <span className="text-vibrant">Dialectic</span>
+            </h2>
+          </div>
         </div>
       </div>
 
-      {error && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="mb-8 p-5 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm flex items-center gap-4 backdrop-blur-md"
-        >
-            <AlertCircle size={20} />
-            <div className="flex flex-col">
-                <span className="font-black uppercase tracking-widest text-[10px]">Simulation Error</span>
-                <span className="font-bold">{error}</span>
-            </div>
-        </motion.div>
-      )}
-
+      {/* ── Workspace ───────────────────────────────────────────────────────── */}
       <div className={cn(
-        "grid gap-8 pb-20",
-        deviceInfo.isMobile ? "grid-cols-1" : "grid-cols-2"
+        'flex-1 flex flex-col gap-6 transition-all duration-500',
+        deviceInfo.isMobile ? 'p-6' : 'p-12',
       )}>
-        
-        {/* Gemini Column */}
-        <BentoItem delay={0.1} className={cn(
-          "min-h-[500px] flex flex-col transition-all duration-700",
-          isDebating && leftHistory.length === rightHistory.length ? "border-jb-accent/40 shadow-[0_0_30px_-5px_rgba(60,113,247,0.2)]" : ""
-        )}>
-            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-2.5 rounded-xl bg-jb-accent/10 border border-jb-accent/20 text-jb-accent">
-                        <Bot size={20} />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-white font-black text-sm uppercase tracking-tight">Gemini Pro</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Aggressive Proponent</span>
-                        </div>
-                    </div>
-                </div>
-                {isDebating && leftHistory.length === rightHistory.length && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-mono font-bold tracking-[0.2em] uppercase text-jb-accent">Thinking</span>
-                        <div className="w-1.5 h-1.5 rounded-full bg-jb-accent animate-pulse shadow-[0_0_8px_rgba(60,113,247,0.8)]" />
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 space-y-6">
-                <AnimatePresence>
-                  {leftHistory.map((m, i) => (
-                    <motion.div 
-                      key={i} 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-jb-accent/5 border border-jb-accent/10 p-6 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg relative overflow-hidden group"
-                    >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-jb-accent/40" />
-                        <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parse(m.content || '') as string }} />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {isDebating && leftHistory.length === rightHistory.length && (
-                   <div className="flex flex-col gap-3 opacity-20">
-                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-3/4" />
-                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-1/2" />
-                   </div>
-                )}
-            </div>
-        </BentoItem>
 
-        {/* Ollama Column */}
-        <BentoItem delay={0.2} className={cn(
-          "min-h-[500px] flex flex-col transition-all duration-700",
-          isDebating && leftHistory.length > rightHistory.length ? "border-jb-orange/40 shadow-[0_0_30px_-5px_rgba(249,115,22,0.2)]" : ""
+        {/* Topic input */}
+        <div className="glass-panel rounded-[2rem] overflow-hidden">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 p-5">
+            <div className="flex-1">
+              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest block mb-2">
+                Debate Topic
+              </span>
+              <input
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleStartDebate(); }}
+                placeholder="Enter a topic for the dialectic..."
+                disabled={isDebating}
+                className="w-full bg-transparent text-[14px] font-medium text-white placeholder:text-slate-700 outline-none input-focus-ring disabled:opacity-50 transition-opacity"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Reset */}
+              <AnimatePresence>
+                {hasContent && !isDebating && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    onClick={() => setDebate(EMPTY_DEBATE)}
+                    className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-slate-500 hover:text-white transition-colors"
+                  >
+                    <RefreshCw size={14} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+
+              {/* Ignite */}
+              <button
+                onClick={handleStartDebate}
+                disabled={isDebating || !topic.trim()}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-jb-orange/15 border border-jb-orange/25 text-jb-orange text-[10px] font-black uppercase tracking-widest hover:bg-jb-orange/25 disabled:opacity-30 transition-all shadow-lg"
+              >
+                {isDebating ? (
+                  <><RefreshCw size={13} className="animate-spin" /> Simulating...</>
+                ) : (
+                  <><Sparkles size={13} /> Ignite Debate</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Error */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="flex items-center gap-3 p-4 rounded-2xl bg-rose-500/[0.08] border border-rose-500/20 text-rose-400"
+            >
+              <AlertCircle size={16} className="shrink-0" />
+              <div>
+                <span className="text-[9px] font-black uppercase tracking-widest block mb-0.5">Simulation Error</span>
+                <span className="text-xs">{error}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Two-panel arena ────────────────────────────────────────────── */}
+        <div className={cn(
+          'grid gap-5',
+          deviceInfo.isMobile ? 'grid-cols-1' : 'grid-cols-2',
         )}>
-            <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-2.5 rounded-xl bg-jb-orange/10 border border-jb-orange/20 text-jb-orange">
-                        <Bot size={20} />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-white font-black text-sm uppercase tracking-tight">Qwen 2.5</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Skeptical Opponent</span>
-                        </div>
-                    </div>
-                </div>
-                {isDebating && leftHistory.length > rightHistory.length && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-mono font-bold tracking-[0.2em] uppercase text-jb-orange">Processing</span>
-                        <div className="w-1.5 h-1.5 rounded-full bg-jb-orange animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
-                    </div>
+          <DebatePanel role="proponent" content={debate.proponent} agentName="Gemini Pro" isLoading={isDebating} />
+          <DebatePanel role="critic"    content={debate.critic}    agentName="Qwen 2.5"   isLoading={isDebating} />
+        </div>
+
+        {/* ── Synthesis (full-width, purple) ─────────────────────────────── */}
+        <AnimatePresence>
+          {(isDebating || debate.synthesis) && (
+            <motion.div
+              key="synthesis"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="glass-panel rounded-[1.5rem] overflow-hidden border-l-4 border-jb-purple"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-white/[0.04]">
+                <GitMerge size={15} className="text-jb-purple shrink-0" />
+                <span className="px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border bg-jb-purple/10 border-jb-purple/25 text-jb-purple">
+                  SYNTHESIS
+                </span>
+                <h3 className="font-black tracking-tight text-sm">
+                  <span className="text-vibrant">Synthesis</span>
+                </h3>
+                {/* Loading dots */}
+                {isDebating && !debate.synthesis && (
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                        transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
+                        className="w-1.5 h-1.5 rounded-full bg-jb-purple"
+                        style={{ boxShadow: '0 0 8px rgba(157,91,210,0.8)' }}
+                      />
+                    ))}
+                  </div>
                 )}
-            </div>
-             <div className="flex-1 space-y-6">
-                <AnimatePresence>
-                  {rightHistory.map((m, i) => (
-                    <motion.div 
-                      key={i} 
-                      initial={{ opacity: 0, y: 10 }}
+              </div>
+
+              {/* Body */}
+              <div className="p-5">
+                <AnimatePresence mode="wait">
+                  {debate.synthesis ? (
+                    <motion.p
+                      key="synthesis-content"
+                      initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-jb-orange/5 border border-jb-orange/10 p-6 rounded-2xl text-sm text-slate-200 leading-relaxed shadow-lg relative overflow-hidden group"
+                      className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"
                     >
-                         <div className="absolute top-0 left-0 w-1 h-full bg-jb-orange/40" />
-                         <div className="prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: parse(m.content || '') as string }} />
+                      {debate.synthesis}
+                    </motion.p>
+                  ) : (
+                    <motion.div
+                      key="synthesis-skeleton"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="space-y-3"
+                    >
+                      {[80, 60, 70, 45].map((w, i) => (
+                        <div
+                          key={i}
+                          className="h-2.5 rounded-full bg-white/[0.04] animate-pulse"
+                          style={{ width: `${w}%`, animationDelay: `${i * 150}ms` }}
+                        />
+                      ))}
                     </motion.div>
-                  ))}
+                  )}
                 </AnimatePresence>
-                {isDebating && leftHistory.length > rightHistory.length && (
-                   <div className="flex flex-col gap-3 opacity-20">
-                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-3/4" />
-                      <div className="bg-white/10 animate-pulse rounded-full h-3 w-1/2" />
-                   </div>
-                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Idle state ─────────────────────────────────────────────────── */}
+        {!hasContent && !isDebating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-6 py-20"
+          >
+            <div className="flex items-end gap-3">
+              {[
+                { color: 'bg-jb-accent',  glow: 'rgba(60,113,247,0.5)',  delay: 0   },
+                { color: 'bg-jb-orange',  glow: 'rgba(251,146,60,0.5)',  delay: 0.5 },
+                { color: 'bg-jb-purple',  glow: 'rgba(157,91,210,0.5)',  delay: 1.0 },
+              ].map((dot, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ y: [0, -7, 0], opacity: [0.25, 0.65, 0.25] }}
+                  transition={{ repeat: Infinity, duration: 2.5, delay: dot.delay, ease: 'easeInOut' }}
+                  className={cn('w-2.5 h-2.5 rounded-full', dot.color)}
+                  style={{ boxShadow: `0 0 8px ${dot.glow}` }}
+                />
+              ))}
             </div>
-        </BentoItem>
+            <p className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-700 text-center">
+              Enter a topic to ignite the dialectic
+            </p>
+          </motion.div>
+        )}
 
       </div>
     </div>

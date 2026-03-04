@@ -9,13 +9,48 @@ interface ChatHeaderProps {
   compact?: boolean;
 }
 
-const CLOUD_QUICK_MODELS = [
-  { label: 'Llama 3.3 70B', value: 'llama-3.3-70b-versatile', provider: 'groq' },
-  { label: 'Gemma 2 9B', value: 'gemma2-9b-it', provider: 'groq' },
-  { label: 'Gemini 1.5 Flash', value: 'gemini-1.5-flash', provider: 'gemini' },
-  { label: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash-exp', provider: 'gemini' },
-  { label: 'DeepSeek R1 70B', value: 'deepseek-r1-distill-llama-70b', provider: 'groq' },
-];
+const PROVIDER_GROUPS = [
+  {
+    id: 'groq',
+    label: 'Groq',
+    models: [
+      // Production
+      { label: 'Llama 3.3 70B', value: 'llama-3.3-70b-versatile' },
+      { label: 'Llama 3.1 8B', value: 'llama-3.1-8b-instant' },
+      { label: 'GPT OSS 120B', value: 'openai/gpt-oss-120b' },
+      // Preview
+      { label: 'Llama 4 Scout 17B', value: 'meta-llama/llama-4-scout-17b-16e-instruct' },
+      { label: 'Qwen3 32B', value: 'qwen/qwen3-32b' },
+      { label: 'Kimi K2', value: 'moonshotai/kimi-k2-instruct-0905' },
+    ],
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    models: [
+      // Gemini 3 series (latest)
+      { label: 'Gemini 3.1 Pro', value: 'gemini-3.1-pro-preview' },
+      { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' },
+      // Gemini 2.5 series (stable)
+      { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+      { label: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+      { label: 'Gemini 2.5 Flash Lite', value: 'gemini-2.5-flash-lite' },
+    ],
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    models: [
+      // Top by usage (Mar 2026 rankings)
+      { label: 'Claude Sonnet 4', value: 'anthropic/claude-sonnet-4' },
+      { label: 'Claude Sonnet 4.5', value: 'anthropic/claude-sonnet-4.5' },
+      { label: 'Gemini 2.5 Flash', value: 'google/gemini-2.5-flash' },
+      { label: 'Gemini 2.5 Pro', value: 'google/gemini-2.5-pro' },
+      { label: 'DeepSeek V3', value: 'deepseek/deepseek-chat-v3-0324' },
+      { label: 'Llama 4 Scout', value: 'meta-llama/llama-4-scout-17b-16e-instruct' },
+    ],
+  },
+] as const;
 
 export const ChatHeader = ({ compact }: ChatHeaderProps) => {
   const {
@@ -35,6 +70,7 @@ export const ChatHeader = ({ compact }: ChatHeaderProps) => {
   const isMobile = deviceInfo.isMobile;
   const [showHistory, setShowHistory] = useState(false);
   const [showModelDrop, setShowModelDrop] = useState(false);
+  const [cloudProvider, setCloudProvider] = useState<'groq' | 'gemini' | 'openrouter'>('groq');
   const dropRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -122,15 +158,15 @@ export const ChatHeader = ({ compact }: ChatHeaderProps) => {
             {!compact && <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.5em] mb-1.5 opacity-60">Model</span>}
             <button
               onClick={() => setShowModelDrop(v => !v)}
-              className="flex items-center gap-2 group"
+              className="flex items-center gap-2 group border border-white/[0.08] hover:border-jb-orange/40 bg-white/[0.03] rounded-xl px-2.5 py-1.5 transition-all"
             >
               <span className={cn("font-extrabold text-jb-accent uppercase tracking-[0.2em]", compact ? "text-[10px]" : "text-[12px]")}>{displayProvider}</span>
               {!isMobile && (
-                <span className={cn("font-mono font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 uppercase tracking-widest group-hover:border-jb-accent/30 group-hover:text-slate-300 transition-all", compact ? "text-[8px]" : "text-[10px]")}>
+                <span className={cn("font-mono font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10 uppercase tracking-widest group-hover:border-jb-orange/30 group-hover:text-slate-300 transition-all", compact ? "text-[8px]" : "text-[10px]")}>
                   {displayModel}
                 </span>
               )}
-              <ChevronDown size={10} className={cn("text-slate-600 group-hover:text-jb-accent transition-all", showModelDrop && "rotate-180")} />
+              <ChevronDown size={10} className={cn("text-jb-orange group-hover:text-jb-orange/80 transition-all", showModelDrop && "rotate-180")} />
             </button>
 
             {/* Model Dropdown */}
@@ -141,7 +177,7 @@ export const ChatHeader = ({ compact }: ChatHeaderProps) => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
                   transition={{ type: 'spring', damping: 28, stiffness: 400 }}
-                  className="absolute top-full mt-2 left-0 z-[300] w-[260px] bg-[#0a0a0f] border border-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.7)] overflow-hidden"
+                  className="absolute top-full mt-2 left-0 z-[300] w-[280px] bg-[#0a0a0f] border border-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.7)] overflow-hidden"
                 >
                   {/* Provider Toggle */}
                   <div className="p-3 border-b border-white/5">
@@ -178,24 +214,41 @@ export const ChatHeader = ({ compact }: ChatHeaderProps) => {
                         </div>
                       </div>
                     ) : (
-                      CLOUD_QUICK_MODELS.map(m => (
-                        <button
-                          key={m.value}
-                          onClick={() => handleSelectCloudModel(m.value, m.provider)}
-                          className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all",
-                            selectedCloudModel === m.value
-                              ? "bg-jb-accent/10 border border-jb-accent/20"
-                              : "hover:bg-white/[0.04]"
-                          )}
-                        >
-                          <div>
-                            <p className={cn("text-[10px] font-bold", selectedCloudModel === m.value ? "text-jb-accent" : "text-slate-300")}>{m.label}</p>
-                            <p className="text-[8px] font-mono text-slate-600 mt-0.5 uppercase">{m.provider}</p>
-                          </div>
-                          {selectedCloudModel === m.value && <Check size={10} className="text-jb-accent flex-shrink-0" />}
-                        </button>
-                      ))
+                      <>
+                        {/* Cloud provider sub-tabs */}
+                        <div className="flex gap-1 mb-2 bg-white/[0.03] rounded-lg p-0.5">
+                          {PROVIDER_GROUPS.map(g => (
+                            <button
+                              key={g.id}
+                              onClick={() => setCloudProvider(g.id as any)}
+                              className={cn(
+                                "flex-1 py-1 rounded-md text-[8px] font-black uppercase tracking-wider transition-all",
+                                cloudProvider === g.id
+                                  ? "bg-jb-accent/20 text-jb-accent border border-jb-accent/30"
+                                  : "text-slate-600 hover:text-slate-400"
+                              )}
+                            >
+                              {g.label}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Models for selected provider */}
+                        {PROVIDER_GROUPS.find(g => g.id === cloudProvider)?.models.map(m => (
+                          <button
+                            key={m.value}
+                            onClick={() => handleSelectCloudModel(m.value, cloudProvider)}
+                            className={cn(
+                              "w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all",
+                              selectedCloudModel === m.value && selectedCloudProvider === cloudProvider
+                                ? "bg-jb-accent/10 border border-jb-accent/20"
+                                : "hover:bg-white/[0.04]"
+                            )}
+                          >
+                            <p className={cn("text-[10px] font-bold", selectedCloudModel === m.value && selectedCloudProvider === cloudProvider ? "text-jb-accent" : "text-slate-300")}>{m.label}</p>
+                            {selectedCloudModel === m.value && selectedCloudProvider === cloudProvider && <Check size={10} className="text-jb-accent flex-shrink-0" />}
+                          </button>
+                        ))}
+                      </>
                     )}
                   </div>
 

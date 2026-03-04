@@ -4,6 +4,15 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    'bg-jb-purple', 'bg-jb-accent', 'bg-jb-orange', 'bg-emerald-500',
+    'from-jb-purple', 'from-jb-accent', 'from-jb-orange', 'from-emerald-500',
+    'to-jb-purple', 'to-jb-accent', 'to-jb-orange', 'to-emerald-500',
+    'border-jb-purple', 'border-jb-accent', 'border-jb-orange',
+    'text-jb-purple', 'text-jb-accent', 'text-jb-orange',
+    'bg-jb-purple/5', 'bg-jb-accent/5', 'bg-jb-orange/5',
+    'border-jb-purple/20', 'border-jb-accent/20', 'border-jb-orange/20',
+  ],
   theme: {
     extend: {
       colors: {
