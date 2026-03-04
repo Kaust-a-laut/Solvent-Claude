@@ -91,7 +91,9 @@ export class MemoryConsolidationService {
         { role: 'user', content: prompt }
       ], { model: 'llama-3.3-70b-versatile', temperature: 0, jsonMode: true });
 
-      const analysis = JSON.parse(res.replace(/```json/g, '').replace(/```/g, ''));
+      const cleaned = res.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```json/g, '').replace(/```/g, '').trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      const analysis = JSON.parse(jsonMatch ? jsonMatch[0] : cleaned);
 
       // Dynamic import to avoid circular dependency
       const { toolService } = require('./toolService');
@@ -227,7 +229,6 @@ export class MemoryConsolidationService {
     }`;
 
     const providers = [
-      { name: 'gemini', model: 'gemini-3-flash-preview' },
       { name: 'gemini', model: 'gemini-2.5-pro' },
       { name: 'gemini', model: 'gemini-2.0-flash' },
       { name: 'groq', model: 'llama-3.3-70b-versatile' },

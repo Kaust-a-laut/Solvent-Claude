@@ -41,7 +41,7 @@ export async function getSecret(): Promise<string> {
   // Primary: Electron preload provides the secret
   if (window.electron?.getSessionSecret) {
     cachedSecret = await window.electron.getSessionSecret();
-    return cachedSecret;
+    return cachedSecret!;
   }
 
   // Dev mode fallback: read secret from Vite env variable
@@ -49,7 +49,7 @@ export async function getSecret(): Promise<string> {
   const devSecret = (import.meta as any).env?.VITE_BACKEND_SECRET;
   if (devSecret) {
     cachedSecret = devSecret;
-    return cachedSecret;
+    return cachedSecret!;
   }
 
   // Dev auto-fallback: fetch the actual secret from the backend's /dev-secret endpoint.
@@ -63,7 +63,7 @@ export async function getSecret(): Promise<string> {
       if (res.ok) {
         const data = await res.json() as { secret: string };
         cachedSecret = data.secret;
-        return cachedSecret;
+        return cachedSecret!;
       }
     } catch {
       // Backend not running yet — fall through to error below
@@ -88,7 +88,7 @@ export async function fetchWithRetry(
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const headers: Record<string, string> = {
-        ...options.headers,
+        ...(options.headers as Record<string, string> | undefined),
         'X-Solvent-Secret': secret
       };
 

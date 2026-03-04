@@ -30,10 +30,10 @@ export class TaskService {
   constructor(redisUrl: string = 'redis://127.0.0.1:6379') {
     this.redis = new Redis(redisUrl);
     
-    // Initialize all queues
+    // Initialize all queues — each Queue gets its own connection per BullMQ recommendation
     Object.values(TaskQueue).forEach(queueName => {
       this.queues.set(queueName, new Queue(queueName, { 
-        connection: this.redis,
+        connection: this.redis.duplicate(),
         defaultJobOptions: {
           attempts: 3,
           backoff: {
@@ -128,48 +128,23 @@ export class TaskService {
   }
 
   async getJobStatus(jobId: string): Promise<{ status: string; progress: number; result?: any; error?: string }> {
-    // Look for the job in all queues
+    // Look for the job in all queues — use getState() for a single Redis round-trip
     for (const queue of this.queues.values()) {
       const job = await queue.getJob(jobId);
       if (job) {
-        let status = 'unknown';
-        let progress = 0;
-        
-        if (await job.isActive()) {
-          status = 'active';
-          progress = typeof job.progress === 'number' ? job.progress : 0;
-        } else if (await job.isCompleted()) {
-          status = 'completed';
-          progress = 100;
-        } else if (await job.isFailed()) {
-          status = 'failed';
-          progress = 100;
-        } else if (await job.isDelayed()) {
-          status = 'delayed';
-        } else if (await job.isWaiting()) {
-          status = 'waiting';
-        }
-        
-        let result = undefined;
-        let error = undefined;
-        
-        if (status === 'completed') {
-          result = job.returnvalue;
-        } else if (status === 'failed') {
-          error = job.failedReason;
-        }
-        
+        const state = await job.getState();
+        const progress = typeof job.progress === 'number' ? job.progress : (state === 'completed' || state === 'failed' ? 100 : 0);
+
         return {
-          status,
+          status: state,
           progress,
-          result,
-          error
+          result: state === 'completed' ? job.returnvalue : undefined,
+          error: state === 'failed' ? job.failedReason : undefined,
         };
       }
     }
     
-    // If job wasn't found in any queue, it might have been processed and removed
-    // In this case, we can't determine its status anymore
+    // Job not found — likely already removed after completion (removeOnComplete: true)
     return {
       status: 'unknown',
       progress: 0

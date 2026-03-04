@@ -58,7 +58,8 @@ export class WaterfallService {
     notepadContent?: string, 
     openFiles?: any[], 
     signal?: AbortSignal, 
-    forceProceed: boolean = false
+    forceProceed: boolean = false,
+    resumeArchitect?: any  // pre-computed architect result from a paused run
   ): AsyncGenerator<WaterfallProgressEvent, WaterfallResult, void> {
     
     let fullPrompt = notepadContent 
@@ -83,8 +84,15 @@ ${fullPrompt}`;
 
     if (signal?.aborted) throw new SolventError('Waterfall cancelled by user.', SolventErrorCode.OPERATION_CANCELLED);
 
-    yield { phase: 'architecting', message: 'Analyzing project requirements...' };
-    const architect = await this.runStep(WaterfallStep.ARCHITECT, fullPrompt, null, globalProvider, signal);
+    let architect: any;
+    if (resumeArchitect) {
+      // Resume from a previously gated run — reuse the architect result to avoid re-running the step
+      architect = resumeArchitect;
+      yield { phase: 'architecting', message: 'Resuming from previous analysis...' };
+    } else {
+      yield { phase: 'architecting', message: 'Analyzing project requirements...' };
+      architect = await this.runStep(WaterfallStep.ARCHITECT, fullPrompt, null, globalProvider, signal);
+    }
     
     // --- RESOURCE GOVERNANCE GATE ---
     const estimate = ResourceEstimator.estimate(architect.complexity || 'medium', fullPrompt.length);
@@ -94,8 +102,7 @@ ${fullPrompt}`;
             message: 'High resource usage detected. User confirmation required.',
             estimate 
         };
-        // We must return a partial result here effectively pausing
-        // The generator ends. The caller must handle resumption by restarting with forceProceed=true
+        // Generator ends here. Caller resumes by passing forceProceed=true and resumeArchitect=architect.
         return { status: 'paused', estimate, architect } as any; 
     }
     // --------------------------------
@@ -150,8 +157,8 @@ ${fullPrompt}`;
 
   // Wrapper for backward compatibility (AIController consumes this)
   // We will refactor AIController next to use the generator directly for streaming
-  async runAgenticWaterfall(prompt: string, globalProvider: string = 'auto', maxRetries: number = 2, onProgress?: (phase: string, data?: any) => void, notepadContent?: string, openFiles?: any[], signal?: AbortSignal, forceProceed: boolean = false) {
-    const generator = this.runAgenticWaterfallGenerator(prompt, globalProvider, maxRetries, notepadContent, openFiles, signal, forceProceed);
+  async runAgenticWaterfall(prompt: string, globalProvider: string = 'auto', maxRetries: number = 2, onProgress?: (phase: string, data?: any) => void, notepadContent?: string, openFiles?: any[], signal?: AbortSignal, forceProceed: boolean = false, resumeArchitect?: any) {
+    const generator = this.runAgenticWaterfallGenerator(prompt, globalProvider, maxRetries, notepadContent, openFiles, signal, forceProceed, resumeArchitect);
     
     while (true) {
       const { value, done } = await generator.next();
@@ -279,15 +286,17 @@ Please address these issues in your revised code.`;
     let compilationStatus = "Not tested";
     if (executorData.code) {
       if (signal?.aborted) throw new SolventError('Waterfall cancelled by user.', SolventErrorCode.OPERATION_CANCELLED);
+      const tempFile = `.temp_review_${Date.now()}.ts`;
+      const { toolService } = require('./toolService');
       try {
-        const tempFile = `.temp_review_${Date.now()}.ts`;
-        const { toolService } = require('./toolService');
         await toolService.executeTool('write_file', { path: tempFile, content: executorData.code });
         const check = await toolService.executeTool('run_shell', { command: `node --check ${tempFile}` });
         compilationStatus = check.stderr ? `Syntax Error: ${check.stderr}` : "Syntax Validated (node --check)";
-        await toolService.executeTool('run_shell', { command: `rm ${tempFile}` });
       } catch (e: any) {
         compilationStatus = `Check Failed: ${e.message}`;
+      } finally {
+        // Always clean up the temp file, even if the check throws
+        await toolService.executeTool('run_shell', { command: `rm -f ${tempFile}` }).catch(() => {});
       }
     }
 

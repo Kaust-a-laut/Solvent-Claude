@@ -9,8 +9,15 @@ export interface IStorage {
 }
 
 export class StorageService implements IStorage {
-  // In-memory fallback. In prod, replace methods to call Redis.
+  // In-memory fallback. Circuit breaker state is lost on restart.
+  // In production, replace this implementation with a Redis-backed store.
   private memory = new Map<string, { val: any, exp: number }>();
+
+  constructor() {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[StorageService] WARNING: Using in-memory storage in production. Circuit breaker state will not survive restarts. Configure a Redis-backed StorageService for production use.');
+    }
+  }
 
   async get<T>(key: string): Promise<T | null> {
     const data = this.memory.get(key);

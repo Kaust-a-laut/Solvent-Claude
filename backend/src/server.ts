@@ -79,6 +79,10 @@ io.on('connection', (socket) => {
 
 supervisorService.setIO(io);
 
+// Break circular dependency: supervisorService ↔ toolService
+import { toolService } from './services/toolService';
+supervisorService.setToolService(toolService);
+
 // --- Mission Progress Bridge: BullMQ → Socket.io ---
 // Workers can't access Socket.io directly; QueueEvents bridges the gap
 try {

@@ -21,7 +21,7 @@ export class FileService {
     return this.uploadDir;
   }
 
-  async extractText(filePath: string, mimeType: string, originalName: string): Promise<string> {
+  async extractText(filePath: string, mimeType: string, originalName: string): Promise<{ text: string; supported: boolean }> {
     try {
       const ext = path.extname(originalName).toLowerCase();
       
@@ -29,12 +29,12 @@ export class FileService {
         const dataBuffer = await fs.readFile(filePath);
         const { default: pdf } = await import('pdf-parse');
         const data = await (pdf as any)(dataBuffer);
-        return data.text;
+        return { text: data.text, supported: true };
       } 
       
       if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || ext === '.docx') {
         const result = await mammoth.extractRawText({ path: filePath });
-        return result.value;
+        return { text: result.value, supported: true };
       }
 
       const codeExtensions = [
@@ -45,13 +45,13 @@ export class FileService {
       ];
       
       if (codeExtensions.includes(ext) || mimeType.startsWith('text/')) {
-        return await fs.readFile(filePath, 'utf-8');
+        return { text: await fs.readFile(filePath, 'utf-8'), supported: true };
       }
 
-      return "";
+      return { text: '', supported: false };
     } catch (error) {
       console.error("[FileService] Text extraction failed:", error);
-      return "";
+      return { text: '', supported: false };
     }
   }
 
