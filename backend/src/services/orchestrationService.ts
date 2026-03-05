@@ -127,7 +127,7 @@ export class OrchestrationService {
   ): Promise<string> {
     const provider = await providerSelector.select({
       priority: 'cost',
-      requirements: {}
+      requirements: { inputTokens: 0, outputTokens: 0 }
     });
     const model = provider.defaultModel || 'default';
 
@@ -212,8 +212,10 @@ Be direct, specific, and actionable. Avoid restating the initial synthesis verba
       // Use intelligent selection based on priority
       const priority = options.priority || 'cost'; // Default to saving money
       
-      // Estimate token usage for cost calculation
-      const inputTokens = goal.length * 2; // Rough estimation
+      // Approximate token counts for cost estimation.
+      // ~4 chars/token is the standard heuristic for English text (GPT tokenizer average).
+      // This is intentionally conservative — actual costs may be lower for code/JSON.
+      const inputTokens = Math.ceil(goal.length / 4);
       const outputTokens = 1000; // Estimated output length
       
       provider = await providerSelector.select({
@@ -289,13 +291,8 @@ Be direct, specific, and actionable. Avoid restating the initial synthesis verba
         synthesis
       };
     } catch (error) {
-      // 4. Failure Telemetry
+      // Record failure so the circuit breaker can open if this provider keeps failing
       await circuitBreaker.recordFailure(provider.id);
-      
-      // 5. Retry Logic (Simplified)
-      logger.warn(`Provider ${provider.id} failed, retrying selection...`);
-      
-      // Re-throw the error to be handled by caller
       throw error;
     }
   }

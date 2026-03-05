@@ -46,7 +46,7 @@ export class SettingsService {
       }
     }
     
-    return this.settings;
+    return this.settings!;
   }
 
   async saveSettings(): Promise<void> {

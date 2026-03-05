@@ -7,7 +7,9 @@ export const PROJECT_ROOT = path.resolve(__dirname, '../../../');
 
 export const validatePath = (targetPath: string) => {
   const normalized = path.resolve(PROJECT_ROOT, targetPath);
-  if (!normalized.startsWith(PROJECT_ROOT)) {
+  // Use trailing separator to prevent prefix attacks (e.g. /root vs /root-evil)
+  const rootWithSep = PROJECT_ROOT.endsWith(path.sep) ? PROJECT_ROOT : PROJECT_ROOT + path.sep;
+  if (!normalized.startsWith(rootWithSep) && normalized !== PROJECT_ROOT) {
     throw new Error(`SECURITY ALERT: Path escape detected: ${targetPath}`);
   }
   return normalized;

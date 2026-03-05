@@ -23,7 +23,9 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
+    // Strip directory components from the original name to prevent path traversal
+    const safeName = path.basename(file.originalname);
+    const uniqueName = `${Date.now()}-${safeName}`;
     cb(null, uniqueName);
   },
 });

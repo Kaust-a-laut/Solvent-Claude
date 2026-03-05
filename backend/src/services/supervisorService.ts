@@ -10,9 +10,21 @@ export interface SupervisorState {
   graphEdges: any[];
 }
 
+// Tools the Overseer is permitted to call autonomously.
+// Restricting to this set prevents prompt-injection attacks from escalating to
+// arbitrary shell execution or memory invalidation.
+const OVERSEER_ALLOWED_TOOLS = new Set([
+  'crystallize_memory',
+  'read_file',
+  'list_files',
+  'web_search',
+]);
+
 export class SupervisorService {
   private io: Server | null = null;
-  private isProcessing = false;
+  private toolServiceRef: any = null; // injected to break circular dependency
+  private isSupervisorProcessing = false; // guards supervise()
+  private isThinkProcessing = false;      // guards think()
   private thinkDepth = 0;
   private readonly MAX_DEPTH = 2;
   private readonly TOOL_BUDGET = 5;
@@ -20,6 +32,19 @@ export class SupervisorService {
 
   setIO(io: Server) {
     this.io = io;
+  }
+
+  /** Called from server.ts after both services are instantiated to break the circular import. */
+  setToolService(toolService: any) {
+    this.toolServiceRef = toolService;
+  }
+
+  private getToolService(): any {
+    if (!this.toolServiceRef) {
+      // Lazy fallback for cases where setToolService hasn't been called yet
+      this.toolServiceRef = require('./toolService').toolService;
+    }
+    return this.toolServiceRef;
   }
 
   incrementToolBudget() {
@@ -30,9 +55,9 @@ export class SupervisorService {
   }
 
   async supervise(noteContent: string, currentGraph: any) {
-    if (this.isProcessing || !noteContent || noteContent.length < 20) return;
+    if (this.isSupervisorProcessing || !noteContent || noteContent.length < 20) return;
     
-    this.isProcessing = true;
+    this.isSupervisorProcessing = true;
     logger.info('[Supervisor] Analyzing mission delta via Groq LPU...');
 
     try {
@@ -83,12 +108,12 @@ export class SupervisorService {
 
         // Auto-Crystallization from Supervisor
         if (analysis.crystallize && analysis.crystallize.content) {
-           const { toolService } = require('./toolService');
+           const toolService = this.getToolService();
            await toolService.executeTool('crystallize_memory', {
              content: analysis.crystallize.content,
              type: analysis.crystallize.type || 'architectural_decision',
              tags: ['supervisor_detected']
-           });
+           }, true);
            logger.info(`[Supervisor] Crystallized: ${analysis.crystallize.content}`);
         }
       }
@@ -99,7 +124,7 @@ export class SupervisorService {
     } catch (error) {
       logger.error('[Supervisor] Supervision loop failed', error);
     } finally {
-      this.isProcessing = false;
+      this.isSupervisorProcessing = false;
     }
   }
 
@@ -200,7 +225,7 @@ export class SupervisorService {
       [key: string]: unknown;
     };
   }) {
-    if (this.isProcessing) return;
+    if (this.isThinkProcessing) return;
 
     // GUARD: Recursion depth
     if (this.thinkDepth >= this.MAX_DEPTH) {
@@ -208,12 +233,12 @@ export class SupervisorService {
       return;
     }
 
-    this.isProcessing = true;
+    this.isThinkProcessing = true;
     this.thinkDepth++;
     this.toolCallsInCycle = 0;
 
     try {
-      const { toolService } = require('./toolService');
+      const toolService = this.getToolService();
       const gemini = await AIProviderFactory.getProvider('gemini');
 
       // 1. Build enriched live context from all signal sources
@@ -258,10 +283,15 @@ export class SupervisorService {
       const result = this.parseResponse(response);
 
       if (result) {
-        // Execute Tool if Overseer decides it's necessary
+        // Execute Tool if Overseer decides it's necessary — validate against allowlist first
         if (result.intervention?.toolToExecute) {
-          logger.info(`[Overseer] Executing autonomous tool: ${result.intervention.toolToExecute.name}`);
-          await toolService.executeTool(result.intervention.toolToExecute.name, result.intervention.toolToExecute.args);
+          const toolName = result.intervention.toolToExecute.name;
+          if (OVERSEER_ALLOWED_TOOLS.has(toolName)) {
+            logger.info(`[Overseer] Executing autonomous tool: ${toolName}`);
+            await toolService.executeTool(toolName, result.intervention.toolToExecute.args, true);
+          } else {
+            logger.warn(`[Overseer] Blocked disallowed tool from LLM output: ${toolName}`);
+          }
         }
 
         // Notify UI via Socket
@@ -273,7 +303,7 @@ export class SupervisorService {
             content: result.crystallize.content,
             type: result.crystallize.type,
             tags: ['overseer_decision']
-          });
+          }, true);
         }
       }
 
@@ -281,7 +311,7 @@ export class SupervisorService {
       logger.error('[Overseer] Autonomous reasoning failed', error);
     } finally {
       this.thinkDepth--;
-      this.isProcessing = false;
+      this.isThinkProcessing = false;
     }
   }
 
@@ -289,7 +319,7 @@ export class SupervisorService {
    * Proactive Memory: Analyzes current context (focus/files) to surface relevant rules *before* mistakes happen.
    */
   async provideGuidance(contextFocus: string) {
-    if (this.isProcessing || !contextFocus) return;
+    if (this.isSupervisorProcessing || !contextFocus) return;
     
     try {
       // 1. Semantic Search for Rules/Decisions only
