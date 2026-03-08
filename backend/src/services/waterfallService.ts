@@ -4,6 +4,7 @@ import { WATERFALL_CONFIG, MODELS } from '../constants/models';
 import { AppError } from '../utils/AppError';
 import { ResourceEstimator, ResourceEstimate } from '../utils/resourceEstimator';
 import { SolventError, SolventErrorCode } from '../utils/errors';
+import { toolService } from './toolService';
 
 /**
  * Threaded context ledger passed through every waterfall step.
@@ -366,7 +367,7 @@ Output JSON:
     if (executorData.code) {
       if (signal?.aborted) throw new SolventError('Waterfall cancelled by user.', SolventErrorCode.OPERATION_CANCELLED);
       const tempFile = `.temp_review_${Date.now()}.ts`;
-      const { toolService } = require('./toolService');
+      
       try {
         await toolService.executeTool('write_file', { path: tempFile, content: executorData.code });
         const check = await toolService.executeTool('run_shell', { command: `node --check ${tempFile}` });
@@ -425,7 +426,7 @@ Output JSON:
 
       if (parsed.score > 90 && parsed.crystallizable_insight) {
         try {
-          const { toolService } = require('./toolService');
+          
           await toolService.executeTool('crystallize_memory', {
             content: parsed.crystallizable_insight,
             type: 'solution_pattern',
@@ -571,7 +572,7 @@ Please address these issues in your revised code.`;
     if (executorData.code) {
       if (signal?.aborted) throw new SolventError('Waterfall cancelled by user.', SolventErrorCode.OPERATION_CANCELLED);
       const tempFile = `.temp_review_${Date.now()}.ts`;
-      const { toolService } = require('./toolService');
+      
       try {
         await toolService.executeTool('write_file', { path: tempFile, content: executorData.code });
         const check = await toolService.executeTool('run_shell', { command: `node --check ${tempFile}` });
@@ -624,7 +625,7 @@ Please address these issues in your revised code.`;
       // If the code is excellent, we save the "Secret Sauce" to long-term memory automatically.
       if (parsed.score > 90 && parsed.crystallizable_insight) {
         try {
-          const { toolService } = require('./toolService');
+          
           await toolService.executeTool('crystallize_memory', {
             content: parsed.crystallizable_insight,
             type: 'solution_pattern',
