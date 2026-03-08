@@ -51,6 +51,11 @@ export class SupervisorService {
   private readonly TOOL_BUDGET = 5;
   private toolCallsInCycle = 0;
 
+  // Rolling window of decisions made this session — injected into each think() call
+  // so the Overseer remembers what it already decided and doesn't contradict itself.
+  private decisionLedger: string[] = [];
+  private readonly MAX_LEDGER_ENTRIES = 10;
+
   constructor() {
     // Listen for budget increment events emitted by ToolService (breaks circular import)
     appEventBus.on('supervisor:increment-tool-budget', () => {
@@ -114,7 +119,7 @@ export class SupervisorService {
       }`;
 
       const response = await groq.generateChatCompletion([
-        { role: 'system', content: 'You are a sub-100ms LPU-optimized project supervisor.' },
+        { role: 'system', content: 'You are the Solvent Knowledge Graph Manager. Your job is to keep the project knowledge graph accurate, surface crystallizable architectural insights, and identify when new stable rules emerge from user notes. Respond in strict JSON only — no prose outside the JSON object.' },
         { role: 'user', content: prompt }
       ], { model: 'llama-3.3-70b-versatile', temperature: 0.1 });
 
@@ -262,37 +267,40 @@ export class SupervisorService {
       // 1. Build enriched live context from all signal sources
       const liveContext = await this.buildLiveContext(context.activity, context.data || {});
 
-      // 2. Formulate the Overseer's internal state
-      const prompt = `You are the SOLVENT AI OVERSEER.
-      You are the all-knowing decision engine assistant for this project.
-      You have access to live context from notepad directives, recent conversation, crystallized memory, and mission results.
+      // 2. Formulate the Overseer's reasoning prompt with decision ledger
+      const ledgerSection = this.decisionLedger.length > 0
+        ? `\n\n═══ OVERSEER SESSION MEMORY (your previous decisions this session) ═══\n${this.decisionLedger.map((d, i) => `${i + 1}. ${d}`).join('\n')}\nDo not contradict these decisions without flagging it explicitly.`
+        : '';
 
-      TRIGGER: ${context.activity}
+      const prompt = `You are the SOLVENT OVERSEER — an autonomous engineering intelligence monitoring this IDE session in real time.
 
-      LIVE CONTEXT:
-      ${liveContext}
+You do not write code. You watch, analyze, and intervene when it matters. Your decisions appear in the user's Command Center. Be direct and specific — never vague.
 
-      YOUR CAPABILITIES:
-      - You have full access to Vector Memory.
-      - You can execute tools via the system (File I/O, Shell, Tests).
-      - You can proactively intervene if the user deviates from architecture.
+TRIGGER: ${context.activity}${ledgerSection}
 
-      TASK:
-      Analyze the current state based on the live context above. If something is missing, risky, or crystallizable, formulate a decision.
-      Be concise and specific — your response goes directly to the user in their Command Center.
+═══ LIVE SESSION CONTEXT ═══
+${liveContext}
 
-      RESPONSE FORMAT (JSON):
-      {
-        "decision": "Your high-level conclusion",
-        "intervention": {
-          "needed": boolean,
-          "type": "warning|suggestion|action",
-          "message": "Direct message to the user",
-          "toolToExecute": { "name": "tool_name", "args": {} } (OR null)
-        },
-        "crystallize": { "content": "Knowledge to save", "type": "architectural_decision|rule" } (OR null),
-        "mentalMapUpdate": "Changes to reflect in the knowledge graph"
-      }`;
+═══ DECISION PROTOCOL ═══
+1. ASSESS: What is actually happening in this session right now?
+2. COMPARE: Does it align with established rules, past decisions, and the active mission?
+3. DECIDE: Is intervention needed? If yes, what specifically? If no, is there anything worth crystallizing?
+4. ACT: Use tools sparingly — only when a tool call provides clear value (e.g., crystallizing a new pattern). Do not call tools out of habit.
+
+Allowed tools: ${Array.from(OVERSEER_ALLOWED_TOOLS).join(', ')}
+
+RESPONSE FORMAT (strict JSON):
+{
+  "decision": "Your concise conclusion about the current state — one or two sentences",
+  "intervention": {
+    "needed": true|false,
+    "type": "warning|suggestion|action",
+    "message": "Direct message to the user — specific and actionable",
+    "toolToExecute": { "name": "tool_name", "args": {} } (OR null)
+  },
+  "crystallize": { "content": "The architectural rule or decision to save permanently", "type": "architectural_decision|permanent_rule" } (OR null),
+  "mentalMapUpdate": "Brief note on how the knowledge graph should change, or null"
+}`;
 
       const response = await gemini.complete([
         { role: 'user', content: prompt }
@@ -301,6 +309,14 @@ export class SupervisorService {
       const result = this.parseResponse(response);
 
       if (result) {
+        // Append this decision to the session ledger so future think() calls have continuity
+        if (result.decision) {
+          this.decisionLedger.push(`[${context.activity}] ${result.decision}`);
+          if (this.decisionLedger.length > this.MAX_LEDGER_ENTRIES) {
+            this.decisionLedger.shift(); // rolling window — drop oldest
+          }
+        }
+
         // Execute Tool if Overseer decides it's necessary — validate against allowlist first
         if (result.intervention?.toolToExecute) {
           const toolName = result.intervention.toolToExecute.name;
@@ -386,7 +402,7 @@ export class SupervisorService {
       }
 
     } catch (error) {
-       // Silent fail
+      logger.warn('[Supervisor] provideGuidance failed', error instanceof Error ? error.message : error);
     }
   }
 }
