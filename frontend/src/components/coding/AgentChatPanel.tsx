@@ -6,6 +6,7 @@ import type { AgentMessage, CodeSuggestion } from '../../store/codingSlice';
 import { fetchWithRetry } from '../../lib/api-client';
 import { API_BASE_URL } from '../../lib/config';
 import { AgentCodeBlock } from './AgentCodeBlock';
+import { ChatImportButton } from './ChatImportButton';
 import {
   SLASH_COMMANDS,
   parseSlashCommand,
@@ -52,6 +53,13 @@ export const AgentChatPanel: React.FC = () => {
   // Cleanup: abort any in-flight request on unmount
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
+  }, []);
+
+  const handleAttach = useCallback((fileName: string, content: string) => {
+    const ext = fileName.split('.').pop() ?? 'text';
+    const block = `[Attached: ${fileName}]\n\`\`\`${ext}\n${content}\n\`\`\`\n`;
+    setInput((prev) => (prev ? `${block}\n${prev}` : block));
+    inputRef.current?.focus();
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -324,7 +332,11 @@ export const AgentChatPanel: React.FC = () => {
           </div>
         )}
         {/* Text input */}
-        <div className="flex items-end gap-2">
+        <div className="relative flex items-end gap-2">
+          <ChatImportButton
+            onAttach={handleAttach}
+            onImported={() => { /* tree panel refreshes on its own */ }}
+          />
           <textarea
             ref={inputRef}
             value={input}
