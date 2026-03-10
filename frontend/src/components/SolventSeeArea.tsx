@@ -57,6 +57,52 @@ const MANUAL_TOOLS:  ToolId[] = ['adjust', 'filters', 'transform'];
 const AI_TOOLS:      ToolId[] = ['generate', 'analyze', 'edit', 'colors'];
 const OVERLAY_TOOLS: ToolId[] = ['crop', 'select'];
 
+// ─── ToolGrid Component ───────────────────────────────────────────────────────
+
+interface ToolGridProps {
+  activeTool: ToolId;
+  setActiveTool: (id: ToolId) => void;
+  setSelection: (s: SelectionRect | null) => void;
+}
+
+const ToolGridComponent: React.FC<ToolGridProps> = ({ activeTool, setActiveTool, setSelection }) => (
+  <div className="space-y-3 shrink-0">
+    {TOOL_GRID.map((section) => (
+      <div key={section.label}>
+        <span className="text-[7px] font-black text-slate-700 uppercase tracking-[0.3em] block mb-1.5 px-0.5">
+          {section.label}
+        </span>
+        <div className="grid grid-cols-3 gap-1.5">
+          {section.tools.map((tool) => {
+            const Icon     = tool.icon;
+            const isActive = activeTool === tool.id;
+            return (
+              <button
+                key={tool.id}
+                onClick={() => {
+                  setActiveTool(tool.id);
+                  if (!OVERLAY_TOOLS.includes(tool.id)) setSelection(null);
+                }}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all border',
+                  isActive
+                    ? cn(tool.accent, 'border-white/10', tool.color)
+                    : 'bg-white/[0.02] border-white/5 text-slate-600 hover:text-slate-300 hover:bg-white/[0.04] hover:border-white/8',
+                )}
+              >
+                <Icon size={14} />
+                <span className="text-[8px] font-black uppercase tracking-wide leading-none text-center">
+                  {tool.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const SolventSeeArea = () => {
@@ -349,45 +395,6 @@ export const SolventSeeArea = () => {
   const isOverlayTool = OVERLAY_TOOLS.includes(activeTool);
   const isExportTool  = activeTool === 'export';
 
-  // ── Inline ToolGrid (closes over activeTool / setActiveTool) ─────────────
-  const ToolGrid = () => (
-    <div className="space-y-3 shrink-0">
-      {TOOL_GRID.map((section) => (
-        <div key={section.label}>
-          <span className="text-[7px] font-black text-slate-700 uppercase tracking-[0.3em] block mb-1.5 px-0.5">
-            {section.label}
-          </span>
-          <div className="grid grid-cols-3 gap-1.5">
-            {section.tools.map((tool) => {
-              const Icon     = tool.icon;
-              const isActive = activeTool === tool.id;
-              return (
-                <button
-                  key={tool.id}
-                  onClick={() => {
-                    setActiveTool(tool.id);
-                    if (!OVERLAY_TOOLS.includes(tool.id)) setSelection(null);
-                  }}
-                  className={cn(
-                    'flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all border',
-                    isActive
-                      ? cn(tool.accent, 'border-white/10', tool.color)
-                      : 'bg-white/[0.02] border-white/5 text-slate-600 hover:text-slate-300 hover:bg-white/[0.04] hover:border-white/8',
-                  )}
-                >
-                  <Icon size={14} />
-                  <span className="text-[8px] font-black uppercase tracking-wide leading-none text-center">
-                    {tool.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div ref={containerRef} className="flex-1 flex overflow-hidden bg-black/20 backdrop-blur-3xl w-full">
@@ -673,7 +680,11 @@ export const SolventSeeArea = () => {
               <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
 
                 {/* ── Tool Grid (always at top) ──────────────────────────── */}
-                <ToolGrid />
+                <ToolGridComponent
+                  activeTool={activeTool}
+                  setActiveTool={setActiveTool}
+                  setSelection={setSelection}
+                />
 
                 {/* Divider */}
                 <div className="h-[1px] bg-white/5" />
