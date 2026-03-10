@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Paperclip, Upload, AlertCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -24,13 +24,19 @@ interface ToastState {
 export const ChatImportButton: React.FC<ChatImportButtonProps> = ({ onAttach, onImported }) => {
   const attachInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const readerRef = useRef<FileReader | null>(null);
+  const isSubmittingRef = useRef(false);
   const [pendingImport, setPendingImport] = useState<{ name: string; content: string } | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
+  // Abort any in-progress FileReader on unmount
+  useEffect(() => () => { readerRef.current?.abort(); }, []);
+
   const readFile = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
+      readerRef.current = reader;
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error('Could not read file.'));
       reader.readAsText(file);
@@ -43,7 +49,7 @@ export const ChatImportButton: React.FC<ChatImportButtonProps> = ({ onAttach, on
     setWarning(null);
 
     if (file.size > MAX_ATTACH_BYTES) {
-      setWarning(`${file.name} is too large to attach (max 500 KB). Use Import to project instead.`);
+      setWarning('File too large to attach. Use Import to project instead.');
       return;
     }
 
@@ -51,7 +57,7 @@ export const ChatImportButton: React.FC<ChatImportButtonProps> = ({ onAttach, on
       const content = await readFile(file);
       // Detect binary (null bytes or UTF-8 replacement char)
       if (content.includes('\u0000') || content.includes('\uFFFD')) {
-        setWarning('Binary files cannot be attached as context.');
+        setWarning("Binary files can't be attached as context.");
         return;
       }
       onAttach(file.name, content);
@@ -75,7 +81,8 @@ export const ChatImportButton: React.FC<ChatImportButtonProps> = ({ onAttach, on
   };
 
   const handleConfirmImport = async (folder: string) => {
-    if (!pendingImport) return;
+    if (!pendingImport || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     const filePath = folder === '.' ? pendingImport.name : `${folder}/${pendingImport.name}`;
     const { name, content } = pendingImport;
     setPendingImport(null);
@@ -90,6 +97,8 @@ export const ChatImportButton: React.FC<ChatImportButtonProps> = ({ onAttach, on
       setToast({ fileName: name, folder, filePath, fileContent: content });
     } catch (err: unknown) {
       setWarning(err instanceof Error ? err.message : 'Import failed.');
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
