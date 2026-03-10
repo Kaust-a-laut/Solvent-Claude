@@ -133,12 +133,12 @@ export const SolventSeeArea = () => {
     document.body.style.cursor = 'default';
   }, [handleMouseMove]);
 
-  const startResizing = () => {
+  const startResizing = useCallback(() => {
     isResizing.current = true;
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', stopResizing);
     document.body.style.cursor = 'col-resize';
-  };
+  }, [handleMouseMove, stopResizing]);
 
   // ── Image upload ──────────────────────────────────────────────────────────
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
