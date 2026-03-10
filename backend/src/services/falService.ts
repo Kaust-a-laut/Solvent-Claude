@@ -16,7 +16,7 @@ export class FalService {
    * @returns base64-encoded PNG image.
    */
   async generateImage(prompt: string, apiKey: string): Promise<{ base64: string; mimeType: string }> {
-    logger.info(`[FAL] Generating image: "${prompt.slice(0, 80)}..."`);
+    logger.debug(`[FAL] Generating image: "${prompt.slice(0, 80)}..."`);
 
     // Step 1: Submit request to FAL queue
     const submitRes = await axios.post(
