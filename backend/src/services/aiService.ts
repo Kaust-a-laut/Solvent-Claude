@@ -33,7 +33,7 @@ const IMAGE_INTENT_KEYWORDS = [
 /**
  * Regex pattern for explicit image generation intent at start of message
  */
-const EXPLICIT_IMAGE_INTENT_REGEX = /^(draw|imagine|visualize|generate|make|create)\b/i;
+const EXPLICIT_IMAGE_INTENT_REGEX = /^(?:(draw|imagine|visualize)\b|(generate|make|create|render)\b.{0,60}\b(image|picture|photo|art|illustration|graphic|sketch|painting)\b)/i;
 
 /**
  * Regex pattern for removing image intent phrases from prompt
@@ -398,7 +398,9 @@ Output your internal reasoning process inside <thinking> tags.`
         const groq = await AIProviderFactory.getProvider('groq');
         const res = await groq.complete(messages, { model: 'llama-3.3-70b-versatile', temperature: temp, maxTokens, apiKey: apiKeys?.groq });
         return { response: res, model: 'llama-3.3-70b-versatile', info: 'Groq fallback' };
-      } catch (e) {}
+      } catch (e: unknown) {
+        logger.warn('[Fallback] Groq failed', e instanceof Error ? e.message : e);
+      }
     }
 
     if (failedProvider !== 'openrouter') {
@@ -406,7 +408,9 @@ Output your internal reasoning process inside <thinking> tags.`
         const openRouter = await AIProviderFactory.getProvider('openrouter');
         const res = await openRouter.complete(messages, { model: 'google/gemini-2.0-flash-001:free', temperature: temp, maxTokens, apiKey: apiKeys?.openrouter });
         return { response: res, model: 'openrouter/gemini', info: 'OpenRouter fallback' };
-      } catch (e) {}
+      } catch (e: unknown) {
+        logger.warn('[Fallback] OpenRouter failed', e instanceof Error ? e.message : e);
+      }
     }
 
     try {
@@ -444,21 +448,10 @@ Output your internal reasoning process inside <thinking> tags.`
     }
 
     try {
-      const gemini = await AIProviderFactory.getProvider('gemini');
-      const geminiKey = options.apiKeys?.gemini || apiKey || config.GEMINI_API_KEY;
-      if (!geminiKey) throw new Error('Gemini API key missing');
-      const result = await gemini.complete([{role: 'user', content: `Generate an image with the prompt: ${prompt}`}], {
-        model: model || 'imagen-3.0-generate-001',
-        apiKey: geminiKey
-      });
-      return this.saveImage(result.base64);
-    } catch (error: any) {
-      try {
-        const result = await pollinationsService.generateImage(prompt);
-        return this.saveImage(result.base64, 'Pollinations.ai');
-      } catch (pollError: any) {
-        throw SolventError.provider('All image providers failed.');
-      }
+      const result = await pollinationsService.generateImage(prompt);
+      return this.saveImage(result.base64, 'Pollinations.ai');
+    } catch (pollError: any) {
+      throw SolventError.provider('All image providers failed.');
     }
   }
 

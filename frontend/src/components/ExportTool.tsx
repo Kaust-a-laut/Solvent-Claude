@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { SliderRow } from './ManualEditTools';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,40 +18,6 @@ export interface ExportToolProps {
   selectedImage: string | null;
   disabled: boolean;
 }
-
-// ─── Local SliderRow (same pattern as ManualEditTools) ────────────────────────
-
-interface SliderRowProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  unit?: string;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}
-
-const SliderRow = ({ label, value, min, max, unit = '', onChange, disabled }: SliderRowProps) => (
-  <div className="space-y-1.5">
-    <div className="flex items-center justify-between">
-      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
-      <span className="text-[9px] font-mono text-slate-400">{value}{unit}</span>
-    </div>
-    <input
-      type="range"
-      min={min}
-      max={max}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      disabled={disabled}
-      className={cn(
-        'w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer',
-        'bg-white/[0.06] accent-jb-accent',
-        disabled && 'opacity-40 cursor-not-allowed',
-      )}
-    />
-  </div>
-);
 
 // ─── ToggleSwitch ─────────────────────────────────────────────────────────────
 
@@ -109,6 +76,9 @@ export const ExportTool: React.FC<ExportToolProps> = ({ selectedImage, disabled 
       link.download = `solvent-export.${ext}`;
       link.click();
 
+      setIsExporting(false);
+    };
+    img.onerror = () => {
       setIsExporting(false);
     };
     img.src = selectedImage;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, RefreshCw, Search } from 'lucide-react';
+import { ImportFileButton } from './ImportFileButton';
 import { cn } from '../../lib/utils';
 import { fetchWithRetry } from '../../lib/api-client';
 import { BASE_URL } from '../../lib/config';
@@ -94,6 +95,7 @@ export const FileTreePanel: React.FC<Props> = ({ onFileSelect }) => {
           <button className="p-1 hover:bg-white/10 rounded text-white/30 hover:text-white/60">
             <Search size={11} />
           </button>
+          <ImportFileButton onImported={fetchFiles} />
         </div>
       </div>
       {/* Files section label */}
