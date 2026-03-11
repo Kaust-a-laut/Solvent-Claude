@@ -1,14 +1,30 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from './useAppStore';
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock fetchWithRetry so tests never hit getSecret() or the real network
+vi.mock('../lib/api-client', () => ({
+  fetchWithRetry: vi.fn(),
+  getSecret: vi.fn().mockResolvedValue('test-secret'),
+  APIError: class APIError extends Error {
+    body: unknown;
+    status?: number;
+    constructor(message: string, status?: number, _statusText?: string, body?: unknown) {
+      super(message);
+      this.name = 'APIError';
+      this.status = status;
+      this.body = body;
+    }
+  },
+}));
+
+import { fetchWithRetry } from '../lib/api-client';
 
 describe('useAppStore', () => {
   beforeEach(() => {
-    // Reset store state before each test if possible or just clear messages
+    // Reset store state — include sessions to prevent message accumulation across tests
     useAppStore.setState({
       messages: [],
+      sessions: {},
       isProcessing: false,
     });
     vi.clearAllMocks();
@@ -22,10 +38,7 @@ describe('useAppStore', () => {
   });
 
   it('should handle sendMessage success', async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({ response: 'AI Response' }),
-    });
+    (fetchWithRetry as ReturnType<typeof vi.fn>).mockResolvedValue({ response: 'AI Response' });
 
     const { sendMessage } = useAppStore.getState();
     await sendMessage('Hello AI');
@@ -37,10 +50,10 @@ describe('useAppStore', () => {
   });
 
   it('should handle sendMessage failure', async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: 'Service Unavailable' }),
+    const err = Object.assign(new Error('Service Unavailable'), {
+      body: { error: 'Service Unavailable' },
     });
+    (fetchWithRetry as ReturnType<typeof vi.fn>).mockRejectedValue(err);
 
     const { sendMessage } = useAppStore.getState();
     await sendMessage('Hello AI');

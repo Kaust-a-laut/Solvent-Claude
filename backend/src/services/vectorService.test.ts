@@ -1,11 +1,47 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { vectorService } from './vectorService';
 import fs from 'fs/promises';
 import path from 'path';
 
+// Deterministic word-bag embedding so tests run without a real Gemini API key
+const makeEmbedding = (text: string): number[] => {
+  const arr = new Array(768).fill(0);
+  const words = text.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/);
+  for (const word of words) {
+    if (!word) continue;
+    let h = 5381;
+    for (let i = 0; i < word.length; i++) h = ((h << 5) + h + word.charCodeAt(i)) >>> 0;
+    arr[h % 768] += 1;
+  }
+  const mag = Math.sqrt(arr.reduce((s, v) => s + v * v, 0));
+  return mag > 0 ? arr.map(v => v / mag) : arr;
+};
+
+const mockEmbedModel = {
+  embedContent: async (text: string) => ({ embedding: { values: makeEmbedding(text) } }),
+  batchEmbedContents: async ({ requests }: any) => ({
+    embeddings: requests.map((r: any) => ({ values: makeEmbedding(r.content.parts[0].text) })),
+  }),
+};
+
+beforeAll(async () => {
+  (vectorService as any).genAI = { getGenerativeModel: () => mockEmbedModel };
+  // Wait for the constructor's un-awaited loadMemory() to finish, then reset to a clean slate
+  // so it can't race-overwrite entries added by addEntriesBatch during tests.
+  await (vectorService as any).loadMemory();
+  (vectorService as any).memory = [];
+  (vectorService as any).rebuildIndices();
+});
+
 const EMBEDDING_CACHE_PATH = path.resolve(__dirname, '../../../.solvent_embedding_cache.json');
 
 describe('VectorService Enhancements', () => {
+  beforeEach(() => {
+    // Clean memory before each test to avoid cross-test contamination
+    (vectorService as any).memory = [];
+    (vectorService as any).rebuildIndices();
+  });
+
   it('should support batch adding entries', async () => {
     const entries = [
       { text: 'Batch entry 1', metadata: { type: 'test', tags: ['batch'] } },
