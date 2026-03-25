@@ -17,7 +17,7 @@ export interface WaterfallModelSelection {
 export const DEFAULT_MODEL_SELECTION: WaterfallModelSelection =
   WATERFALL_PRESETS_BY_KEY['groq-speed'].selection as WaterfallModelSelection;
 
-interface WaterfallStepBase { message?: string; [key: string]: unknown }
+interface WaterfallStepBase { message?: string; score?: number; issues?: { severity: string; message: string }[]; estimate?: string; [key: string]: unknown }
 interface ArchitectData extends WaterfallStepBase { plan: string }
 interface ReasonerData extends WaterfallStepBase { reasoning: string }
 interface ExecutorData extends WaterfallStepBase { code: string }
