@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config';
 import fs from 'fs/promises';
+import { statSync } from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger';
 import { CrystallizedMemory, CrystallizedRule, SuccessPattern, SupervisoryInsight } from '../types/memory';
@@ -41,6 +42,8 @@ export class VectorService {
   private useHNSW: boolean = true;
   private saveCounter: number = 0;
   private readonly BACKUP_INTERVAL = 50;
+  private hnswSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly HNSW_SAVE_DEBOUNCE_MS = 30_000;
   
   // LRU Cache Configuration
   private readonly MAX_CACHE_SIZE = config.MEMORY_CACHE_SIZE;
@@ -338,11 +341,9 @@ export class VectorService {
         );
       }
 
-      // Persist HNSW index periodically
-      if (this.hnswIndex && this.useHNSW && this.saveCounter % 10 === 0) {
-        this.hnswIndex.save(this.hnswIndexPath).catch(e =>
-          logger.error('[VectorService] HNSW save failed', e)
-        );
+      // Debounced HNSW index persistence
+      if (this.hnswIndex && this.useHNSW) {
+        this.scheduleHnswSave();
       }
     } catch (error) {
       logger.error('Failed to save vector memory', error);
@@ -868,75 +869,65 @@ export class VectorService {
     
 
       private chunkFile(content: string, filePath: string): { text: string, metadata: any }[] {
+        const maxChunkSize = 1200;
+        const overlapSize = 200;
+        const relativePath = path.relative(process.cwd(), filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        const isCodeFile = ['.ts', '.tsx', '.js', '.jsx', '.py'].includes(ext);
 
-        const blocks = content.split(/\n\n+/);
+        // Get file modification time for stale detection
+        let fileModifiedAt: number | undefined;
+        try {
+          fileModifiedAt = statSync(filePath).mtimeMs;
+        } catch { /* ignore */ }
+
+        // For code files, try to split at declaration boundaries first
+        let blocks: string[];
+        if (isCodeFile) {
+          // Split at top-level declarations (class, function, export, interface)
+          const declPattern = /\n(?=(?:export\s+)?(?:class|function|interface|const|let|var|type|enum)\s)/g;
+          const declBlocks = content.split(declPattern).filter(b => b.trim().length > 0);
+          // Use declaration-based splitting if it produces reasonable chunks
+          blocks = declBlocks.length > 1 ? declBlocks : content.split(/\n\n+/);
+        } else {
+          blocks = content.split(/\n\n+/);
+        }
 
         const chunks: { text: string, metadata: any }[] = [];
-
         let currentChunk = "";
 
-        const maxChunkSize = 1200;
-
-    
-
         for (const block of blocks) {
-
           if ((currentChunk + block).length > maxChunkSize && currentChunk.length > 0) {
+            chunks.push({
+              text: currentChunk,
+              metadata: {
+                filePath: relativePath,
+                type: 'code_block',
+                tier: 'episodic',
+                symbols: this.extractSymbols(currentChunk),
+                fileModifiedAt
+              }
+            });
+            // Keep overlap from end of current chunk for context continuity
+            currentChunk = currentChunk.slice(-overlapSize);
+          }
+          currentChunk += (currentChunk ? "\n\n" : "") + block;
+        }
 
-                        chunks.push({
-
-                          text: currentChunk,
-
-                          metadata: { 
-
-                            filePath: path.relative(process.cwd(), filePath),
-
-                            type: 'code_block',
-
-                            tier: 'episodic',
-
-                            symbols: this.extractSymbols(currentChunk)
-
-                          }
-
-                        });
-
-                        currentChunk = "";
-
-                      }
-
-                      currentChunk += (currentChunk ? "\n\n" : "") + block;
-
-                    }
-
-                
-
-                    if (currentChunk.trim().length > 0) {
-
-                      chunks.push({
-
-                        text: currentChunk,
-
-                        metadata: { 
-
-                          filePath: path.relative(process.cwd(), filePath),
-
-                          type: 'code_block',
-
-                          tier: 'episodic',
-
-                          symbols: this.extractSymbols(currentChunk)
-
-                        }
-
-                      });
-
-                    }
-
-            
+        if (currentChunk.trim().length > 0) {
+          chunks.push({
+            text: currentChunk,
+            metadata: {
+              filePath: relativePath,
+              type: 'code_block',
+              tier: 'episodic',
+              symbols: this.extractSymbols(currentChunk),
+              fileModifiedAt
+            }
+          });
+        }
 
         return chunks;
-
       }
 
     
@@ -1197,6 +1188,74 @@ export class VectorService {
       byTier,
       byType
     );
+  }
+
+  /**
+   * Get total number of entries in memory (used by BM25 to detect changes).
+   */
+  getMemorySize(): number {
+    return this.memory.length;
+  }
+
+  /**
+   * Get all entries as id+text pairs (used to build BM25 index).
+   */
+  getAllTexts(): Array<{ id: string; text: string }> {
+    return this.memory
+      .filter(e => e.metadata.status !== 'deprecated' && e.metadata.text)
+      .map(e => ({ id: e.id, text: e.metadata.text }));
+  }
+
+  /**
+   * Get a single entry by ID.
+   */
+  getEntryById(id: string): (VectorEntry & { score: number }) | null {
+    const entry = this.memory.find(e => e.id === id);
+    if (!entry || entry.metadata.status === 'deprecated') return null;
+    return { ...entry, score: 0 };
+  }
+
+  /**
+   * Record that entries were retrieved — increments retrievalCount for reinforcement.
+   */
+  async recordRetrieval(ids: string[]): Promise<void> {
+    let changed = false;
+    for (const id of ids) {
+      const entry = this.memory.find(e => e.id === id);
+      if (entry) {
+        entry.metadata.retrievalCount = (entry.metadata.retrievalCount || 0) + 1;
+        changed = true;
+      }
+    }
+    if (changed) {
+      // Batch save — piggyback on periodic save cycle rather than saving every retrieval
+      this.saveCounter++;
+      if (this.saveCounter % 10 === 0) {
+        await this.saveMemory();
+      }
+    }
+  }
+
+  private scheduleHnswSave() {
+    if (this.hnswSaveTimer) return;
+    this.hnswSaveTimer = setTimeout(() => {
+      this.hnswSaveTimer = null;
+      if (this.hnswIndex) {
+        this.hnswIndex.save(this.hnswIndexPath).catch(e =>
+          logger.error('[VectorService] HNSW save failed', e)
+        );
+      }
+    }, this.HNSW_SAVE_DEBOUNCE_MS);
+  }
+
+  async shutdown() {
+    if (this.hnswSaveTimer) {
+      clearTimeout(this.hnswSaveTimer);
+      this.hnswSaveTimer = null;
+    }
+    if (this.hnswIndex && this.useHNSW) {
+      await this.hnswIndex.save(this.hnswIndexPath);
+    }
   }
 
   private cosineSimilarity(vecA: number[], vecB: number[]): number {

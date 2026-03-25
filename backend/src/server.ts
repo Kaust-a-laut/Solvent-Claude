@@ -21,6 +21,7 @@ import { supervisorService } from './services/supervisorService';
 import { pluginManager } from './services/pluginManager';
 import { settingsService } from './services/settingsService';
 import { taskService, TaskQueue } from './services/taskService';
+import { SocketBatcher } from './lib/socketBatcher';
 
 const app = express();
 const httpServer = createServer(app);
@@ -84,6 +85,7 @@ io.on('connection', (socket) => {
 });
 
 supervisorService.setIO(io);
+const batcher = new SocketBatcher(io, 100);
 
 // --- Mission Progress Bridge: BullMQ → Socket.io ---
 // Workers can't access Socket.io directly; QueueEvents bridges the gap
@@ -91,7 +93,7 @@ try {
   const orchestrationEvents = taskService.getQueueEvents(TaskQueue.ORCHESTRATION);
 
   orchestrationEvents.on('progress', ({ jobId, data }: { jobId: string; data: unknown }) => {
-    io.emit('MISSION_PROGRESS', { jobId, progress: data });
+    batcher.emit('MISSION_PROGRESS', { jobId, progress: data });
   });
 
   orchestrationEvents.on('completed', ({ jobId, returnvalue }: { jobId: string; returnvalue: unknown }) => {

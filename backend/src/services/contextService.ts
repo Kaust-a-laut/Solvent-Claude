@@ -2,13 +2,17 @@ import { ChatRequestData } from '../types/ai';
 import { vectorService } from './vectorService';
 import { getModelContextLimit } from '../constants/models';
 import { memoryMetrics } from '../utils/memoryMetrics';
+import { estimateTokens, getContextBudget } from '../utils/tokenEstimator';
+import { BM25Index, reciprocalRankFusion } from '../utils/bm25';
+import { statSync } from 'fs';
+import { join } from 'path';
 
 // --- Named Constants ---
 
 /**
  * Number of entries to fetch for massive context models (100k+ tokens)
  */
-const RETRIEVAL_COUNT_MASSIVE = 25;
+const RETRIEVAL_COUNT_MASSIVE = 15;
 
 /**
  * Number of entries to fetch for constrained context models (<16k tokens)
@@ -89,6 +93,33 @@ const SCORE_DECAY_CODE_BLOCK_PER_DAY = 0.01;
  * Score multiplier for linked memories
  */
 const LINKED_MEMORY_SCORE_MULTIPLIER = 0.9;
+
+/**
+ * Score penalty for stale code blocks (file modified since indexing)
+ */
+const SCORE_PENALTY_STALE_CODE = 0.5;
+
+/**
+ * Score boost per retrieval (capped at 10 retrievals)
+ */
+const SCORE_BOOST_PER_RETRIEVAL = 0.02;
+const MAX_RETRIEVAL_BOOST_COUNT = 10;
+
+// Shared BM25 index instance — rebuilt when vector memory changes
+const bm25Index = new BM25Index();
+let bm25LastBuildSize = 0;
+
+/**
+ * Rebuild BM25 index if vector memory has changed.
+ */
+function ensureBM25Index() {
+  const memorySize = vectorService.getMemorySize();
+  if (memorySize !== bm25LastBuildSize) {
+    const docs = vectorService.getAllTexts();
+    bm25Index.build(docs);
+    bm25LastBuildSize = memorySize;
+  }
+}
 
 // --- Mode-Specific Instructions (Item 1) ---
 
@@ -267,6 +298,8 @@ export interface ContextProvenance {
     local: number;
     global: number;
     rules: number;
+    tokenBudget?: number;
+    tokensUsed?: number;
   };
 }
 
@@ -429,7 +462,10 @@ export class ContextService {
     const isMassiveContext = modelLimit >= 100000;
     const isConstrained = modelLimit < 16000;
 
-    const retrievalCount = isMassiveContext ? RETRIEVAL_COUNT_MASSIVE : (isConstrained ? RETRIEVAL_COUNT_CONSTRAINED : RETRIEVAL_COUNT_DEFAULT);
+    // Token budget for memory retrieval (replaces fixed entry counts as primary limit)
+    const budget = getContextBudget(data.model, data.maxTokens || 2048);
+    // Keep fixed counts as secondary safety cap
+    const maxRetrievalCount = isMassiveContext ? RETRIEVAL_COUNT_MASSIVE : (isConstrained ? RETRIEVAL_COUNT_CONSTRAINED : RETRIEVAL_COUNT_DEFAULT);
     const rulesCount = isMassiveContext ? RULES_COUNT_MASSIVE : RULES_COUNT_DEFAULT;
 
     const keywords = lastMessage.match(/\b([a-zA-Z0-9_-]{5,})\b/g) || [];
@@ -447,8 +483,28 @@ export class ContextService {
       if (ids) ids.forEach((id: string) => tagCandidatesIds.add(id));
     }
 
-    const relevantEntries = await vectorService.search(lastMessage, retrievalCount * 3);
+    const relevantEntries = await vectorService.search(lastMessage, maxRetrievalCount + 5);
     const universalPatterns = await vectorService.search(lastMessage, 5, { tier: 'meta-summary' });
+
+    // BM25 hybrid search — merge keyword and vector signals via Reciprocal Rank Fusion
+    ensureBM25Index();
+    const bm25Results = bm25Index.search(lastMessage, maxRetrievalCount * 3);
+    const rrfRanking = reciprocalRankFusion(
+      relevantEntries.map(e => ({ id: e.id, score: e.score })),
+      bm25Results
+    );
+    const rrfScoreMap = new Map(rrfRanking.map(r => [r.id, r.rrfScore]));
+
+    // Bring in BM25-only results that vector search missed
+    const vectorIdSet = new Set(relevantEntries.map(e => e.id));
+    for (const bm25Result of bm25Results.slice(0, 10)) {
+      if (!vectorIdSet.has(bm25Result.id)) {
+        const entry = vectorService.getEntryById(bm25Result.id);
+        if (entry) {
+          relevantEntries.push({ ...entry, score: 0.5 });
+        }
+      }
+    }
 
     // 2b. Traversal of Links for top candidates
     const topCandidates = relevantEntries.slice(0, 5);
@@ -474,6 +530,21 @@ export class ContextService {
     const activeItems: ProvenanceItem[] = [];
     const suppressedItems: ProvenanceItem[] = [];
 
+    // File mtime cache for stale code detection (scoped to this request)
+    const mtimeCache = new Map<string, number>();
+    function getFileMtime(filePath: string): number | null {
+      if (mtimeCache.has(filePath)) return mtimeCache.get(filePath)!;
+      try {
+        const fullPath = join(process.cwd(), filePath);
+        const mtime = statSync(fullPath).mtimeMs;
+        mtimeCache.set(filePath, mtime);
+        return mtime;
+      } catch {
+        mtimeCache.set(filePath, -1);
+        return null;
+      }
+    }
+
     const scoredEntries = combinedCandidates.map(e => {
       let finalScore = e.score;
       const ageHours = (Date.now() - new Date(e.metadata.timestamp || e.metadata.createdAt || 0).getTime()) / (1000 * 60 * 60);
@@ -482,14 +553,31 @@ export class ContextService {
       else if (e.metadata.type === 'meta_summary') finalScore += SCORE_BOOST_META_SUMMARY;
       else if (e.metadata.crystallized) finalScore += SCORE_BOOST_CRYSTALLIZED;
       else if (e.metadata.type === 'permanent_rule') finalScore += SCORE_BOOST_PERMANENT_RULE;
-      else if (e.metadata.type === 'code_block') finalScore -= (ageHours / 24) * SCORE_DECAY_CODE_BLOCK_PER_DAY;
+      else if (e.metadata.type === 'code_block') {
+        finalScore -= (ageHours / 24) * SCORE_DECAY_CODE_BLOCK_PER_DAY;
+        // Stale code detection: penalize if source file was modified since indexing
+        if (e.metadata.filePath && e.metadata.fileModifiedAt) {
+          const currentMtime = getFileMtime(e.metadata.filePath);
+          if (currentMtime !== null && currentMtime > e.metadata.fileModifiedAt) {
+            finalScore -= SCORE_PENALTY_STALE_CODE;
+          }
+        }
+      }
 
-      uniqueKeywords.forEach(kw => {
-        if (e.metadata.text && e.metadata.text.toLowerCase().includes(kw.toLowerCase())) finalScore += SCORE_BOOST_KEYWORD_MATCH;
-      });
+      // RRF hybrid score boost (replaces simple keyword match boost)
+      const rrfBoost = rrfScoreMap.get(e.id);
+      if (rrfBoost) {
+        finalScore += rrfBoost * 10; // normalize RRF range to meaningful boost
+      }
 
       // Tag match boost
       if (tagCandidatesIds.has(e.id)) finalScore += SCORE_BOOST_TAG_MATCH;
+
+      // Retrieval reinforcement: boost entries that have been retrieved frequently
+      const entryRetrievalCount = e.metadata.retrievalCount || 0;
+      if (entryRetrievalCount > 0) {
+        finalScore += SCORE_BOOST_PER_RETRIEVAL * Math.min(entryRetrievalCount, MAX_RETRIEVAL_BOOST_COUNT);
+      }
 
       return { ...e, finalScore };
     }).sort((a, b) => b.finalScore - a.finalScore);
@@ -497,8 +585,9 @@ export class ContextService {
     // --- SEMANTIC DEDUPLICATION (Optimized with LSH-style pre-filtering) ---
     const dedupedEntries = deduplicateEntries(scoredEntries, suppressedItems);
 
-    // 3. Process Logic: Active vs Suppressed
+    // 3. Process Logic: Active vs Suppressed — token-budget-aware selection
     const minScore = isMassiveContext ? MIN_SCORE_MASSIVE_CONTEXT : MIN_SCORE_STANDARD_CONTEXT;
+    let memoryTokensUsed = 0;
 
     for (const entry of dedupedEntries) {
       const item: ProvenanceItem = {
@@ -537,13 +626,23 @@ export class ContextService {
         item.status = 'suppressed';
         item.reason = 'Conflict with Local Rule';
         suppressedItems.push(item);
-      } else if (activeItems.length < retrievalCount) {
-        activeItems.push(item);
       } else {
-        item.status = 'suppressed';
-        item.reason = 'Context Window Limit';
-        suppressedItems.push(item);
+        // Token budget check (primary) + entry count check (secondary safety cap)
+        const entryTokenCost = estimateTokens(entry.metadata?.text || '');
+        if (memoryTokensUsed + entryTokenCost <= budget.memory && activeItems.length < maxRetrievalCount) {
+          activeItems.push(item);
+          memoryTokensUsed += entryTokenCost;
+        } else {
+          item.status = 'suppressed';
+          item.reason = 'Context Window Limit';
+          suppressedItems.push(item);
+        }
       }
+    }
+
+    // Record retrieval for reinforcement (fire-and-forget)
+    if (activeItems.length > 0) {
+      vectorService.recordRetrieval(activeItems.map(i => i.id)).catch(() => {});
     }
 
     const provenance: ContextProvenance = {
@@ -554,7 +653,9 @@ export class ContextService {
         workspace: data.openFiles?.length || 0,
         local: activeItems.filter(i => i.source === 'LOCAL').length,
         global: activeItems.filter(i => i.source === 'GLOBAL').length,
-        rules: globalRules.length
+        rules: globalRules.length,
+        tokenBudget: budget.memory,
+        tokensUsed: memoryTokensUsed
       }
     };
 
