@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import {
   FlaskConical, Code, Brain, MessageSquare,
-  ScanEye, Globe, Sparkles, Terminal, ArrowRight
+  ScanEye, Globe, Sparkles, Terminal, ArrowRight, Github
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { BentoGrid, BentoCard } from './BentoGrid';
@@ -474,10 +474,24 @@ export const HomeArea = () => {
                 className="vibrant-border relative max-w-3xl rounded-2xl mx-auto md:mx-0"
               >
                 <div className="relative rounded-2xl bg-[#020205] px-8 py-5">
-                  <p className="text-center md:text-left text-white/60 text-base md:text-lg font-medium leading-relaxed tracking-tight">
+                  <p className="text-center md:text-left text-white/75 text-base md:text-lg font-medium leading-relaxed tracking-tight">
                     A consolidated digital workspace designed to bridge the gap between intelligence and execution. From autonomous code to physical outcomes, one interface for everything.
                   </p>
                 </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45 }}
+                className="flex justify-center md:justify-start"
+              >
+                <button
+                  onClick={() => setCurrentMode('chat')}
+                  className="flex items-center gap-2.5 px-7 py-3 text-sm font-black uppercase tracking-wider text-white rounded-full bg-gradient-to-r from-jb-purple to-jb-accent shadow-[0_0_20px_rgba(157,91,210,0.35)] hover:shadow-[0_0_30px_rgba(157,91,210,0.55)] transition-all"
+                >
+                  Get Started <ArrowRight size={16} />
+                </button>
               </motion.div>
 
             </div>
@@ -590,6 +604,25 @@ export const HomeArea = () => {
             );
           })}
         </div>
+
+        {/* Footer */}
+        <footer className="mt-16 border-t border-white/[0.06] py-12">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/30">
+            <div className="flex items-center gap-2">
+              <FlaskConical size={14} className="text-jb-purple/60" />
+              <span>&copy; {new Date().getFullYear()} Solvent AI &mdash; Intelligence meets execution</span>
+            </div>
+            <a
+              href="https://github.com/Kaust-a-laut/Solvent-Claude"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-white/30 hover:text-white/60 transition-colors"
+            >
+              <Github size={14} />
+              <span>GitHub</span>
+            </a>
+          </div>
+        </footer>
       </div>
       </div>{/* close absolute inset-0 scroll container */}
     </div>
