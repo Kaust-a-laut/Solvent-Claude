@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState, Message } from './types';
 import { api } from '../lib/api';
+import { generateUUID } from '../lib/crypto';
 
 function debounce<T extends (...args: any[]) => any>(
   func: T,
@@ -44,7 +45,7 @@ export const createChatSlice: StateCreator<AppState, [], [], ChatSlice> = (set, 
   addMessage: (message, target) => set((state) => {
     const activeMode = target || state.currentMode;
     const currentMessages = state.sessions[activeMode] || [];
-    const msgWithId = message.id ? message : { ...message, id: crypto.randomUUID() };
+    const msgWithId = message.id ? message : { ...message, id: generateUUID() };
     const newMessages = [...currentMessages, msgWithId];
 
     return {
@@ -89,7 +90,7 @@ export const createChatSlice: StateCreator<AppState, [], [], ChatSlice> = (set, 
   persistSession: async () => {
     const state = get();
     const messages = state.sessions[state.currentMode] || [];
-    const sessionId = state.currentSessionId || crypto.randomUUID();
+    const sessionId = state.currentSessionId || generateUUID();
 
     if (messages.length === 0) return;
 
@@ -162,15 +163,15 @@ export const createChatSlice: StateCreator<AppState, [], [], ChatSlice> = (set, 
     const state = get();
     const messages = state.sessions[state.currentMode] || [];
     const messageIndex = messages.findIndex(m => m.id === messageId);
-    
+
     if (messageIndex === -1) {
       console.error('[chatSlice] Message not found for forking:', messageId);
-      return crypto.randomUUID();
+      return generateUUID();
     }
-    
+
     // Copy messages up to and including the fork point
     const forkedMessages = messages.slice(0, messageIndex + 1);
-    const newSessionId = crypto.randomUUID();
+    const newSessionId = generateUUID();
     
     set({
       sessions: { ...state.sessions, [newSessionId]: forkedMessages },
