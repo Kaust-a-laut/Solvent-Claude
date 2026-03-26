@@ -78,9 +78,9 @@ export const GlobalSearch: React.FC = () => {
       const [sessionsRes, memoriesRes] = await Promise.all([
         api.get(`/sessions?search=${encodeURIComponent(searchQuery)}&limit=10`),
         api.post('/memory/search', {
-          q: searchQuery,
+          query: searchQuery,
           limit: 10
-        }).catch(() => ({ data: { entries: [] } }))
+        }).catch(() => ({ data: { results: [] } }))
       ]);
 
       const formattedResults: SearchResult[] = [];

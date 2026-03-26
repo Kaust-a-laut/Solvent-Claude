@@ -45,15 +45,15 @@ export const SupervisorHistory = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Update countdown timers
+  // Update countdown timers — values are absolute expiresAt timestamps;
+  // re-render every second and prune expired entries without transforming values
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
       setTimeRemaining(prev => {
         const updated: Record<string, number> = {};
-        for (const [id, end] of Object.entries(prev)) {
-          const remaining = end - now;
-          if (remaining > 0) updated[id] = remaining;
+        for (const [id, expiresAt] of Object.entries(prev)) {
+          if (expiresAt > now) updated[id] = expiresAt;
         }
         return updated;
       });
@@ -244,8 +244,8 @@ export const SupervisorHistory = () => {
                       Pending Approval
                     </div>
                     {pendingDecisions.map((decision, i) => {
-                      const remaining = timeRemaining[decision.id] || 0;
-                      const isExpiring = remaining < 30000;
+                      const remaining = Math.max(0, (timeRemaining[decision.id] || 0) - Date.now());
+                      const isExpiring = remaining > 0 && remaining < 30000;
                       
                       return (
                         <motion.div

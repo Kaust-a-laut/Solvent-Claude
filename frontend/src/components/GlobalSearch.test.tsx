@@ -16,7 +16,7 @@ describe('GlobalSearch', () => {
   });
 
   it('should call POST /memory/search with correct payload', async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: { entries: [] } });
+    vi.mocked(api.post).mockResolvedValue({ data: { results: [] } });
     vi.mocked(api.get).mockResolvedValue({ data: { sessions: [] } });
 
     render(<GlobalSearch />);
@@ -28,7 +28,7 @@ describe('GlobalSearch', () => {
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/memory/search', {
-        q: 'test query',
+        query: 'test query',
         limit: 10
       });
     });

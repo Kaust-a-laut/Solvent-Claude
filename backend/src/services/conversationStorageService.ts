@@ -50,6 +50,9 @@ export class ConversationStorageService {
   }
 
   private getSessionFilePath(sessionId: string): string {
+    if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+      throw new Error('Invalid session ID');
+    }
     return path.join(SESSIONS_DIR, `${sessionId}.json`);
   }
 
