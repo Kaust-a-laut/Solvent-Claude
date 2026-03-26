@@ -459,8 +459,8 @@ export class VectorService {
       this.cacheEmbedding(text, values);
 
       return values;
-    } catch (err) {
-      logger.warn('[VectorService] Gemini embedding failed, trying Ollama fallback:', err.message);
+    } catch (err: unknown) {
+      logger.warn('[VectorService] Gemini embedding failed, trying Ollama fallback:', err instanceof Error ? err.message : String(err));
     }
 
     // Fallback to Ollama
@@ -469,8 +469,8 @@ export class VectorService {
       memoryMetrics.recordCacheMiss();
       this.cacheEmbedding(text, values);
       return values;
-    } catch (err) {
-      logger.warn('[VectorService] Ollama embedding failed, using zero vector:', err.message);
+    } catch (err: unknown) {
+      logger.warn('[VectorService] Ollama embedding failed, using zero vector:', err instanceof Error ? err.message : String(err));
     }
 
     // Last resort: zero vector
@@ -518,9 +518,9 @@ export class VectorService {
             this.cacheEmbedding(chunk[j], emb.values);
           });
         }
-      } catch (err) {
-        logger.warn('[VectorService] Gemini batch embedding failed, falling back to Ollama:', err.message);
-        
+      } catch (err: unknown) {
+        logger.warn('[VectorService] Gemini batch embedding failed, falling back to Ollama:', err instanceof Error ? err.message : String(err));
+
         // Fallback: Process remaining with Ollama individually
         for (let i = 0; i < missingTexts.length; i++) {
           const originalIndex = missingIndices[i];
@@ -529,8 +529,8 @@ export class VectorService {
               const values = await this.ollama!.embed(missingTexts[i]);
               results[originalIndex] = values;
               this.cacheEmbedding(missingTexts[i], values);
-            } catch (ollamaErr) {
-              logger.warn('[VectorService] Ollama embedding failed for batch item, using zero vector:', ollamaErr.message);
+            } catch (ollamaErr: unknown) {
+              logger.warn('[VectorService] Ollama embedding failed for batch item, using zero vector:', ollamaErr instanceof Error ? ollamaErr.message : String(ollamaErr));
               results[originalIndex] = new Array(768).fill(0);
             }
           }

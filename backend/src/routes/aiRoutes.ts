@@ -189,8 +189,8 @@ router.get('/sessions', async (req, res) => {
       );
     }
     
-    const parsedLimit = parseInt(limit, 10);
-    const parsedOffset = parseInt(offset, 10);
+    const parsedLimit = parseInt(limit as string, 10);
+    const parsedOffset = parseInt(offset as string, 10);
     const paginated = sessions.slice(parsedOffset, parsedOffset + parsedLimit);
     
     res.json({ sessions: paginated, total: sessions.length });
@@ -275,8 +275,8 @@ router.put('/sessions/:id', async (req, res) => {
       metadata: {
         ...existing.metadata,
         messageCount: messages ? messages.length : existing.metadata.messageCount,
-        modelsUsed: messages 
-          ? [...new Set(messages.map((m: any) => m.model).filter(Boolean))]
+        modelsUsed: messages
+          ? [...new Set(messages.map((m: any) => m.model).filter(Boolean))] as string[]
           : existing.metadata.modelsUsed
       }
     };

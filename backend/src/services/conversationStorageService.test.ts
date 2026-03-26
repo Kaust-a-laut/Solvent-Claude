@@ -30,8 +30,8 @@ describe('ConversationStorageService', () => {
       metadata: { modelsUsed: [], messageCount: 0, tokenEstimate: 0, tags: [] }
     };
     
-    const session2 = { ...session1, updatedAt: 2000, messages: [{ id: '1', role: 'user', content: 'new', timestamp: Date.now() }] };
-    const staleSession = { ...session1, updatedAt: 500, messages: [{ id: '1', role: 'user', content: 'old', timestamp: Date.now() }] };
+    const session2 = { ...session1, updatedAt: 2000, messages: [{ id: '1', role: 'user' as const, content: 'new', timestamp: Date.now() }] };
+    const staleSession = { ...session1, updatedAt: 500, messages: [{ id: '1', role: 'user' as const, content: 'old', timestamp: Date.now() }] };
     
     // Save newer version first
     await service.saveSession(session2);

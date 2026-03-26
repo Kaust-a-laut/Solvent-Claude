@@ -20,6 +20,7 @@ describe('POST /api/v1/memory/search', () => {
       {
         id: 'mem-1',
         score: 0.95,
+        vector: [],
         metadata: { type: 'architectural_decision', content: 'Test content' }
       }
     ]);
@@ -64,6 +65,7 @@ describe('POST /api/v1/memory/search', () => {
       {
         id: 'mem-2',
         score: 0.87,
+        vector: [],
         metadata: { type: 'conversation', summary: 'Summarized content' }
       }
     ]);
@@ -81,6 +83,7 @@ describe('POST /api/v1/memory/search', () => {
       {
         id: 'mem-3',
         score: 0.92,
+        vector: [],
         metadata: {
           type: 'decision',
           tier: 'high',
