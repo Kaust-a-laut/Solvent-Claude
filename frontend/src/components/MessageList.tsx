@@ -1,27 +1,30 @@
-import React, { useEffect, useRef } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import React from 'react';
 import { MessageItem } from './MessageItem';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '../lib/utils';
 import { downloadImage } from '../lib/file-utils';
-import { WaterfallVisualizer } from './WaterfallVisualizer';
+import { useVirtualMessages } from '../lib/useVirtualMessages';
 
 interface MessageListProps {
   compact?: boolean;
 }
 
 export const MessageList = ({ compact }: MessageListProps) => {
-  const currentMode = useAppStore(state => state.currentMode);
-  const messages = useAppStore(state => state.messages);
-  const isProcessing = useAppStore(state => state.isProcessing);
-  const modeConfigs = useAppStore(state => state.modeConfigs);
-  const selectedCloudModel = useAppStore(state => state.selectedCloudModel);
-  const selectedLocalModel = useAppStore(state => state.selectedLocalModel);
-  const globalProvider = useAppStore(state => state.globalProvider);
-  const deviceInfo = useAppStore(state => state.deviceInfo);
-  const imageProvider = useAppStore(state => state.imageProvider);
+  const { currentMode, isProcessing, modeConfigs, selectedCloudModel, selectedLocalModel, globalProvider, deviceInfo, imageProvider } = useAppStore(
+    useShallow((state) => ({
+      currentMode: state.currentMode,
+      isProcessing: state.isProcessing,
+      modeConfigs: state.modeConfigs,
+      selectedCloudModel: state.selectedCloudModel,
+      selectedLocalModel: state.selectedLocalModel,
+      globalProvider: state.globalProvider,
+      deviceInfo: state.deviceInfo,
+      imageProvider: state.imageProvider,
+    }))
+  );
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollRef, virtualizer, messages } = useVirtualMessages();
   const isMobile = deviceInfo.isMobile;
 
   // Resolve Active Model Name for the prompt/header area
@@ -39,12 +42,6 @@ export const MessageList = ({ compact }: MessageListProps) => {
     activeModel = selectedLocalModel;
   }
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isProcessing]);
-
   const getTime = () => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -59,9 +56,6 @@ export const MessageList = ({ compact }: MessageListProps) => {
       isCompact ? "pt-20 pb-20 space-y-4" : "pt-[100px] pb-32 space-y-5",
       isMobile ? (compact ? "p-3 pt-16 pb-20" : "p-4 pt-20 pb-24") : "p-6"
     )} ref={scrollRef}>
-      
-      {/* Waterfall Visualization at the top (or contextually could be interspersed, but top is safe) */}
-      <WaterfallVisualizer />
 
       {messages.length === 0 && !isProcessing && (
         <div className="flex-1 flex flex-col items-center justify-center gap-6 py-24 pointer-events-none select-none">
@@ -79,20 +73,39 @@ export const MessageList = ({ compact }: MessageListProps) => {
         </div>
       )}
 
-      <AnimatePresence initial={false}>
-        {messages.map((m, i) => (
-          <MessageItem
-            key={m.id ?? i}
-            message={m}
-            isUser={m.role === 'user'}
-            modelName={m.role === 'user' ? 'User' : (m.model || activeModel)}
-            time={getTime()}
-            onDownloadImage={downloadImage}
-            compact={isCompact}
-          />
-        ))}
-      </AnimatePresence>
-      
+      {messages.length > 0 && (
+        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+          {virtualizer.getVirtualItems().map((virtualItem: { key: React.Key; index: number; start: number }) => {
+            const m = messages[virtualItem.index];
+            const isNew = virtualItem.index >= messages.length - 2;
+            return (
+              <div
+                key={virtualItem.key}
+                data-index={virtualItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              >
+                <MessageItem
+                  message={m}
+                  isUser={m.role === 'user'}
+                  modelName={m.role === 'user' ? 'User' : (m.model || activeModel)}
+                  time={getTime()}
+                  onDownloadImage={downloadImage}
+                  compact={isCompact}
+                  animate={isNew}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {isProcessing && (
          <div className="max-w-4xl mx-auto flex items-center gap-3 px-6">
             <div className="flex gap-1">
