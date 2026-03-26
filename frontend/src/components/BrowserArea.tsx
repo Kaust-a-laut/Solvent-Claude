@@ -238,7 +238,7 @@ export const BrowserArea = () => {
   const togglePinUrl = useCallback(() => {
     if (!activeTab?.url || !activeTab?.pageContent?.title) return;
     
-    const isPinned = browserPinnedUrls.some(p => p.url === activeTab.url);
+    const isPinned = browserPinnedUrls.some((p: { url: string }) => p.url === activeTab.url);
     if (isPinned) {
       removeBrowserPinnedUrl(activeTab.url);
     } else {
@@ -248,7 +248,7 @@ export const BrowserArea = () => {
     }
   }, [activeTab, browserPinnedUrls, removeBrowserPinnedUrl, addBrowserPinnedUrl]);
 
-  const isCurrentUrlPinned = activeTab?.url && browserPinnedUrls.some(p => p.url === activeTab.url);
+  const isCurrentUrlPinned = activeTab?.url && browserPinnedUrls.some((p: { url: string }) => p.url === activeTab.url);
 
   // ── Tab Management ─────────────────────────────────────────────────
   const handleAddTab = useCallback(() => {
@@ -731,7 +731,7 @@ export const BrowserArea = () => {
               <span className="text-[7px] font-mono text-slate-600 bg-white/5 px-1 rounded">{browserPinnedUrls.length}</span>
             </div>
             <div className="p-2 space-y-1">
-              {browserPinnedUrls.map((pinned) => (
+              {browserPinnedUrls.map((pinned: { url: string; title: string; summary?: string }) => (
                 <div
                   key={pinned.url}
                   className="group p-2 bg-white/[0.02] border border-white/5 rounded-lg hover:border-jb-accent/20 transition-all"

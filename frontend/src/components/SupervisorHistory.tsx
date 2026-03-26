@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, ChevronDown, ChevronUp, X, Sparkles, AlertTriangle, Lightbulb, Check, XCircle, Clock, Tool } from 'lucide-react';
+import { Brain, ChevronDown, ChevronUp, X, Sparkles, AlertTriangle, Lightbulb, Check, XCircle, Clock, Wrench } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { api } from '../lib/api';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -255,7 +255,7 @@ export const SupervisorHistory = () => {
                           className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
                         >
                           <div className="flex items-start gap-2 mb-2">
-                            <Tool size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                            <Wrench size={12} className="text-amber-400 mt-0.5 shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-[10px] text-amber-100 font-medium">{decision.decision}</p>
                               {decision.intervention?.message && (

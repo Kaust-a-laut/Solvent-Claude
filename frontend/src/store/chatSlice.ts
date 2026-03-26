@@ -137,8 +137,8 @@ export const createChatSlice: StateCreator<AppState, [], [], ChatSlice> = (set, 
 
   listSessions: async (mode?: string) => {
     try {
-      const params = mode ? { mode } : {};
-      const response = await api.get('/sessions', { params });
+      const url = mode ? `/sessions?mode=${encodeURIComponent(mode)}` : '/sessions';
+      const response = await api.get(url);
       return response.data.sessions;
     } catch (error) {
       console.error('[chatSlice] Failed to list sessions:', error);
