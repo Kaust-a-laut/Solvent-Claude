@@ -16,6 +16,7 @@ import debugRoutes from './routes/debugRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import memoryRoutes from './routes/memoryRoutes';
 import agentRoutes from './routes/agentRoutes';
+import healthRoutes from './routes/healthRoutes';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -245,6 +246,8 @@ app.use((req, res, next) => {
     req.path.startsWith('/files') ||
     req.path.startsWith('/api/files/raw') ||
     req.path === '/health' ||
+    req.path === '/api/v1/health' ||
+    req.path === '/api/v1/ready' ||
     req.path === '/api/v1/health/services' ||
     req.path === '/api/v1/models' ||
     (req.path === '/api/settings' && req.method === 'GET') ||
@@ -263,6 +266,7 @@ app.use((req, res, next) => {
 // --- API Routes ---
 app.use('/api/v1', aiRoutes);
 app.use('/api/v1/agent', agentRoutes);
+app.use('/api/v1', healthRoutes);
 app.use('/api/v1', memoryRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/debug', debugRoutes);
