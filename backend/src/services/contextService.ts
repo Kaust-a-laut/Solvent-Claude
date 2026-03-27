@@ -6,6 +6,7 @@ import { estimateTokens, getContextBudget } from '../utils/tokenEstimator';
 import { BM25Index, reciprocalRankFusion } from '../utils/bm25';
 import { statSync } from 'fs';
 import { join } from 'path';
+import { reranker } from './reranker';
 
 // --- Named Constants ---
 
@@ -521,7 +522,11 @@ export class ContextService {
       }
     }
 
-    // 2b. Traversal of Links for top candidates
+    // 2b. Cross-encoder reranking for top candidates via LLM
+    const reranked = await reranker.rerank(lastMessage, relevantEntries.slice(0, 20));
+    const rerankerScoreMap = new Map(reranked.map(r => [r.id, r.rerankerScore]));
+
+    // 2c. Traversal of Links for top candidates
     const topCandidates = relevantEntries.slice(0, 5);
     const linkedMemories: any[] = [];
     for (const cand of topCandidates) {
@@ -582,7 +587,13 @@ export class ContextService {
       // RRF hybrid score boost (replaces simple keyword match boost)
       const rrfBoost = rrfScoreMap.get(e.id);
       if (rrfBoost) {
-        finalScore += rrfBoost * 10; // normalize RRF range to meaningful boost
+        finalScore += rrfBoost * 10;
+      }
+      
+      // Reranker boost (cross-encoder LLM scoring)
+      const rerankerBoost = rerankerScoreMap.get(e.id);
+      if (rerankerBoost !== undefined) {
+        finalScore += rerankerBoost * 0.05;
       }
 
       // Tag match boost
