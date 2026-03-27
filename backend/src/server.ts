@@ -9,6 +9,14 @@ import path from 'path';
 import { z } from 'zod';
 import { logger } from './utils/logger';
 
+declare global {
+  namespace Express {
+    interface Request {
+      id?: string;
+    }
+  }
+}
+
 // --- Import Routes ---
 import fileRoutes from './routes/fileRoutes';
 import aiRoutes from './routes/aiRoutes';
@@ -188,6 +196,14 @@ try {
 
 // --- Global Middleware ---
 app.use(cors(corsOptions));
+
+// Request ID middleware for tracing
+app.use((req, res, next) => {
+  req.id = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  res.setHeader('x-request-id', req.id);
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // --- Security Middleware ---
@@ -219,11 +235,13 @@ const API_SECRET = config.BACKEND_INTERNAL_SECRET;
 
 console.log(`[Server] API_SECRET initialized: ${API_SECRET === 'solvent_dev_insecure_default' ? '✓ Using default (dev mode)' : '✓ Using custom secret'}`);
 
+const OLD_INSECURE_DEFAULT = 'solvent_dev_insecure_default';
+
 // Dev-only secret exchange endpoint — mirrors what Electron's getSessionSecret() preload does.
 // Allows the browser frontend (running at localhost:5173) to retrieve the session secret
 // so that fetchWithRetry() works in npm run dev without any manual .env setup.
-// Guarded by NODE_ENV check + localhost IP check. Never exists in production.
-if (process.env.NODE_ENV === 'development') {
+// Guarded by NODE_ENV check + localhost IP check + not using insecure default. Never exists in production.
+if (process.env.NODE_ENV === 'development' && config.BACKEND_INTERNAL_SECRET !== OLD_INSECURE_DEFAULT) {
   app.get('/dev-secret', (req, res) => {
     const ip = req.ip || '';
     const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
@@ -356,3 +374,28 @@ startServer().catch(error => {
   console.error('[Server] Failed to start server:', error);
   process.exit(1);
 });
+
+// Graceful shutdown handling
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`[Server] Received ${signal}, starting graceful shutdown...`);
+  
+  httpServer.close(() => {
+    logger.info('[Server] HTTP server closed');
+    process.exit(0);
+  });
+
+  try {
+    await codebaseIndexer.stop();
+    logger.info('[Server] Codebase indexer stopped');
+  } catch (error) {
+    logger.warn('[Server] Error stopping codebase indexer', error);
+  }
+
+  setTimeout(() => {
+    logger.warn('[Server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
