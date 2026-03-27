@@ -235,13 +235,11 @@ const API_SECRET = config.BACKEND_INTERNAL_SECRET;
 
 console.log(`[Server] API_SECRET initialized: ${API_SECRET === 'solvent_dev_insecure_default' ? '✓ Using default (dev mode)' : '✓ Using custom secret'}`);
 
-const OLD_INSECURE_DEFAULT = 'solvent_dev_insecure_default';
-
 // Dev-only secret exchange endpoint — mirrors what Electron's getSessionSecret() preload does.
 // Allows the browser frontend (running at localhost:5173) to retrieve the session secret
 // so that fetchWithRetry() works in npm run dev without any manual .env setup.
-// Guarded by NODE_ENV check + localhost IP check + not using insecure default. Never exists in production.
-if (process.env.NODE_ENV === 'development' && config.BACKEND_INTERNAL_SECRET !== OLD_INSECURE_DEFAULT) {
+// Guarded by NODE_ENV check + localhost IP check. Never exists in production.
+if (process.env.NODE_ENV === 'development') {
   app.get('/dev-secret', (req, res) => {
     const ip = req.ip || '';
     const isLocalhost = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
