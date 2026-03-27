@@ -601,6 +601,7 @@ export class VectorService {
         ...metadata, 
         text, 
         tier: metadata.tier || 'episodic',
+        importance: metadata.importance || 5,
         createdAt: metadata.createdAt || new Date().toISOString(),
         status: metadata.status || 'active',
         links: normalizedLinks
@@ -644,6 +645,7 @@ export class VectorService {
           ...e.metadata,
           text: e.text,
           tier: e.metadata.tier || 'episodic',
+          importance: e.metadata.importance || 5,
           createdAt: e.metadata.createdAt || new Date().toISOString(),
           status: e.metadata.status || 'active',
           links: normalizedLinks

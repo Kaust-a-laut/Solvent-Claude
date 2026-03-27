@@ -106,6 +106,11 @@ const SCORE_PENALTY_STALE_CODE = 0.5;
 const SCORE_BOOST_PER_RETRIEVAL = 0.02;
 const MAX_RETRIEVAL_BOOST_COUNT = 10;
 
+/**
+ * Score boost per importance point (1-10 scale)
+ */
+const SCORE_BOOST_PER_IMPORTANCE = 0.04;
+
 // Shared BM25 index instance — incrementally updated when vector memory changes
 const bm25Index = new BM25Index();
 let bm25IndexedIds = new Set<string>();
@@ -604,6 +609,10 @@ export class ContextService {
       if (entryRetrievalCount > 0) {
         finalScore += SCORE_BOOST_PER_RETRIEVAL * Math.min(entryRetrievalCount, MAX_RETRIEVAL_BOOST_COUNT);
       }
+
+      // Importance score boost (1-10 scale from LLM rating at write time)
+      const importance = e.metadata.importance || 5;
+      finalScore += importance * SCORE_BOOST_PER_IMPORTANCE;
 
       return { ...e, finalScore };
     }).sort((a, b) => b.finalScore - a.finalScore);
