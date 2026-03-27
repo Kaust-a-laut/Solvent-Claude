@@ -105,19 +105,32 @@ const SCORE_PENALTY_STALE_CODE = 0.5;
 const SCORE_BOOST_PER_RETRIEVAL = 0.02;
 const MAX_RETRIEVAL_BOOST_COUNT = 10;
 
-// Shared BM25 index instance — rebuilt when vector memory changes
+// Shared BM25 index instance — incrementally updated when vector memory changes
 const bm25Index = new BM25Index();
-let bm25LastBuildSize = 0;
+let bm25IndexedIds = new Set<string>();
 
 /**
- * Rebuild BM25 index if vector memory has changed.
+ * Incrementally sync the BM25 index with vector memory.
+ * Adds new documents and removes deleted ones instead of full rebuild.
  */
 function ensureBM25Index() {
-  const memorySize = vectorService.getMemorySize();
-  if (memorySize !== bm25LastBuildSize) {
-    const docs = vectorService.getAllTexts();
-    bm25Index.build(docs);
-    bm25LastBuildSize = memorySize;
+  const allDocs = vectorService.getAllTexts();
+  const currentIds = new Set(allDocs.map(d => d.id));
+
+  // Remove deleted documents
+  for (const id of bm25IndexedIds) {
+    if (!currentIds.has(id)) {
+      bm25Index.removeDocument(id);
+      bm25IndexedIds.delete(id);
+    }
+  }
+
+  // Add new documents
+  for (const doc of allDocs) {
+    if (!bm25IndexedIds.has(doc.id)) {
+      bm25Index.addDocument(doc);
+      bm25IndexedIds.add(doc.id);
+    }
   }
 }
 
@@ -265,7 +278,7 @@ function formatMemoryContext(activeItems: ProvenanceItem[]): string {
 
   if (rules.length > 0) {
     const ruleText = rules.length === 1
-      ? `There is a standing rule here: ${cleanText(rules[0].text)}.`
+      ? `There is a standing rule here: ${cleanText(rules[0]!.text)}.`
       : `Standing rules in effect: ${rules.map(r => cleanText(r.text)).join('; ')}.`;
     parts.push(ruleText);
   }
@@ -318,7 +331,7 @@ function computeVectorSignature(vector: number[], buckets: number = 16): string 
     const start = i * bucketSize;
     const end = Math.min(start + bucketSize, vector.length);
     for (let j = start; j < end; j++) {
-      sum += vector[j];
+      sum += vector[j]!;
     }
     signature.push(sum > 0 ? 1 : 0);
   }
@@ -390,9 +403,11 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let magA = 0;
   let magB = 0;
   for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    magA += vecA[i] * vecA[i];
-    magB += vecB[i] * vecB[i];
+    const a = vecA[i] ?? 0;
+    const b = vecB[i] ?? 0;
+    dotProduct += a * b;
+    magA += a * a;
+    magB += b * b;
   }
   const magnitude = Math.sqrt(magA) * Math.sqrt(magB);
   return magnitude === 0 ? 0 : dotProduct / magnitude;
