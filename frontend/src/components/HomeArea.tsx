@@ -452,8 +452,8 @@ export const HomeArea = () => {
               </motion.div>
             </div>
 
-            {/* Text column — heading + paragraph */}
-            <div className="md:flex-1 flex flex-col gap-4 md:gap-6">
+            {/* Text column — heading + paragraph (z-20 lifts above beaker glow) */}
+            <div className="md:flex-1 flex flex-col gap-4 md:gap-6 relative z-20">
 
               <motion.h2
                 initial={{ opacity: 0, y: 20 }}
