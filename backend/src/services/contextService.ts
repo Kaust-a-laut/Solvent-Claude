@@ -6,6 +6,8 @@ import { estimateTokens, getContextBudget } from '../utils/tokenEstimator';
 import { BM25Index, reciprocalRankFusion } from '../utils/bm25';
 import { statSync } from 'fs';
 import { join } from 'path';
+import { reranker } from './reranker';
+import { coreMemory } from './coreMemory';
 
 // --- Named Constants ---
 
@@ -104,6 +106,11 @@ const SCORE_PENALTY_STALE_CODE = 0.5;
  */
 const SCORE_BOOST_PER_RETRIEVAL = 0.02;
 const MAX_RETRIEVAL_BOOST_COUNT = 10;
+
+/**
+ * Score boost per importance point (1-10 scale)
+ */
+const SCORE_BOOST_PER_IMPORTANCE = 0.04;
 
 // Shared BM25 index instance — incrementally updated when vector memory changes
 const bm25Index = new BM25Index();
@@ -521,7 +528,11 @@ export class ContextService {
       }
     }
 
-    // 2b. Traversal of Links for top candidates
+    // 2b. Cross-encoder reranking for top candidates via LLM
+    const reranked = await reranker.rerank(lastMessage, relevantEntries.slice(0, 20));
+    const rerankerScoreMap = new Map(reranked.map(r => [r.id, r.rerankerScore]));
+
+    // 2c. Traversal of Links for top candidates
     const topCandidates = relevantEntries.slice(0, 5);
     const linkedMemories: any[] = [];
     for (const cand of topCandidates) {
@@ -582,7 +593,13 @@ export class ContextService {
       // RRF hybrid score boost (replaces simple keyword match boost)
       const rrfBoost = rrfScoreMap.get(e.id);
       if (rrfBoost) {
-        finalScore += rrfBoost * 10; // normalize RRF range to meaningful boost
+        finalScore += rrfBoost * 10;
+      }
+      
+      // Reranker boost (cross-encoder LLM scoring)
+      const rerankerBoost = rerankerScoreMap.get(e.id);
+      if (rerankerBoost !== undefined) {
+        finalScore += rerankerBoost * 0.05;
       }
 
       // Tag match boost
@@ -593,6 +610,10 @@ export class ContextService {
       if (entryRetrievalCount > 0) {
         finalScore += SCORE_BOOST_PER_RETRIEVAL * Math.min(entryRetrievalCount, MAX_RETRIEVAL_BOOST_COUNT);
       }
+
+      // Importance score boost (1-10 scale from LLM rating at write time)
+      const importance = e.metadata.importance || 5;
+      finalScore += importance * SCORE_BOOST_PER_IMPORTANCE;
 
       return { ...e, finalScore };
     }).sort((a, b) => b.finalScore - a.finalScore);
@@ -798,6 +819,11 @@ ${provenance.workspaceFiles.length > 0
   ? provenance.workspaceFiles.map(f => `• ${f}${data.activeFile && f === data.activeFile ? ' ← **Active tab**' : ''}`).join('\n')
   : '• No files currently open in the workspace.'}
 ${getBrowserContextBlock(data.browserContext)}
+
+${(() => {
+  const coreBlock = coreMemory.toContextBlock();
+  return coreBlock ? `\n[CORE MEMORY — Always Available]\n${coreBlock}\n` : '';
+})()}
 
 **[PROJECT MEMORY — RETRIEVED CONTEXT]**
 ${formatMemoryContext(activeItems)}

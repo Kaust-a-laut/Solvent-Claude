@@ -3,11 +3,19 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import crypto from 'crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
 import { logger } from './utils/logger';
+
+declare global {
+  namespace Express {
+    interface Request {
+      id?: string;
+    }
+  }
+}
 
 // --- Import Routes ---
 import fileRoutes from './routes/fileRoutes';
@@ -31,7 +39,7 @@ import { codebaseIndexer } from './services/codebaseIndexer';
 // Timing-safe secret comparison to prevent timing attacks
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
 const app = express();
@@ -188,6 +196,14 @@ try {
 
 // --- Global Middleware ---
 app.use(cors(corsOptions));
+
+// Request ID middleware for tracing
+app.use((req, res, next) => {
+  req.id = (req.headers['x-request-id'] as string) || randomUUID();
+  res.setHeader('x-request-id', req.id);
+  next();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // --- Security Middleware ---
@@ -356,3 +372,28 @@ startServer().catch(error => {
   console.error('[Server] Failed to start server:', error);
   process.exit(1);
 });
+
+// Graceful shutdown handling
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`[Server] Received ${signal}, starting graceful shutdown...`);
+  
+  httpServer.close(() => {
+    logger.info('[Server] HTTP server closed');
+    process.exit(0);
+  });
+
+  try {
+    await codebaseIndexer.stop();
+    logger.info('[Server] Codebase indexer stopped');
+  } catch (error) {
+    logger.warn('[Server] Error stopping codebase indexer', error);
+  }
+
+  setTimeout(() => {
+    logger.warn('[Server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
