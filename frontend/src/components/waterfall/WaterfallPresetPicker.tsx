@@ -329,7 +329,7 @@ export const WaterfallPresetPicker = () => {
           <div className="flex items-center gap-2">
             <Trophy size={11} className="text-slate-700" />
             <span className="text-[12px] text-slate-700 font-mono">
-              Scores from 60 pipeline runs · MiMo V2 reviewer · Hard prompt
+              Scores from automated pipeline benchmarks · results may vary
             </span>
           </div>
         </div>
