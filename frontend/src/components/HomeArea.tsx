@@ -522,7 +522,7 @@ export const HomeArea = () => {
         </div>
 
         {/* Mode Showcase Strip */}
-        <div className="border-t border-white/[0.03] pt-16 md:pt-24 space-y-24 md:space-y-32 pb-16">
+        <div className="border-t border-white/[0.06] pt-16 md:pt-24 space-y-24 md:space-y-32 pb-16">
           <div className="text-center space-y-2">
             <p className="text-[11px] font-black uppercase tracking-[0.35em] text-white/20">Explore the suite</p>
             <h2 className="text-2xl md:text-3xl font-black text-white/60 tracking-tight">Every tool. One surface.</h2>

@@ -110,7 +110,7 @@ export const ModelPlaygroundArea = () => {
         </div>
 
         {/* Decorative Grid Footer */}
-        <div className="pt-12 border-t border-white/[0.03] flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="pt-12 border-t border-white/[0.06] flex flex-col md:flex-row justify-between items-center gap-6">
            <div className="flex gap-8">
               <div className="space-y-1">
                  <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Latency Matrix</p>

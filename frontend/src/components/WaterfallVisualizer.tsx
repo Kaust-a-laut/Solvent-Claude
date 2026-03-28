@@ -359,7 +359,7 @@ export const WaterfallVisualizer = () => {
                   step.status === 'completed' && 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]',
                   step.status === 'error' && 'bg-rose-500/5 border-rose-500/15',
                   step.status === 'paused' && 'bg-amber-500/5 border-amber-500/15',
-                  step.status === 'idle' && 'bg-black/20 border-white/[0.03] opacity-40',
+                  step.status === 'idle' && 'bg-black/20 border-white/[0.06] opacity-40',
                   hasData && 'cursor-pointer',
                 )}
               >
