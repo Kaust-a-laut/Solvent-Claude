@@ -168,11 +168,11 @@ export const CompareArea = () => {
                       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parse(results.model1 || '') as string) }}
                     />
                 ) : (
-                    <div className="h-full flex flex-col justify-center gap-4 opacity-20">
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-3/4" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-1/2" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-5/6" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-2/3" />
+                    <div className="h-full flex flex-col justify-center gap-4">
+                        <div className="fluid-shimmer rounded-full h-4 w-3/4" />
+                        <div className="fluid-shimmer rounded-full h-4 w-1/2" style={{ animationDelay: '0.3s' }} />
+                        <div className="fluid-shimmer rounded-full h-4 w-5/6" style={{ animationDelay: '0.6s' }} />
+                        <div className="fluid-shimmer rounded-full h-4 w-2/3" style={{ animationDelay: '0.9s' }} />
                     </div>
                 )}
             </div>
@@ -206,11 +206,11 @@ export const CompareArea = () => {
                       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parse(results.model2 || '') as string) }}
                     />
                 ) : (
-                    <div className="h-full flex flex-col justify-center gap-4 opacity-20">
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-3/4" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-1/2" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-5/6" />
-                        <div className="bg-white/10 animate-pulse rounded-full h-4 w-2/3" />
+                    <div className="h-full flex flex-col justify-center gap-4">
+                        <div className="fluid-shimmer rounded-full h-4 w-3/4" />
+                        <div className="fluid-shimmer rounded-full h-4 w-1/2" style={{ animationDelay: '0.3s' }} />
+                        <div className="fluid-shimmer rounded-full h-4 w-5/6" style={{ animationDelay: '0.6s' }} />
+                        <div className="fluid-shimmer rounded-full h-4 w-2/3" style={{ animationDelay: '0.9s' }} />
                     </div>
                 )}
             </div>
